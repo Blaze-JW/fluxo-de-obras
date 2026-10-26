@@ -800,7 +800,7 @@ td.num { font-variant-numeric: tabular-nums; }
   });
 
   // ---------- Importar pedido: AI reads an email / PDF / photo into a draft project ----------
-  var sampleFn = null, imagesOK = false, imp = null;
+  var sampleFn = null, imagesOK = false, imp = null, demoImport = null;
   var NO_IMPORT = { slab: 1, cutDone: 1, installDone: 1, clientSignoff: 1 };
   var IMPORT_FIELDS = FIELDS.filter(function (f) { return !NO_IMPORT[f.key]; });
   var PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
@@ -965,6 +965,7 @@ td.num { font-variant-numeric: tabular-nums; }
       (imp.step === "review" ? "Confirme os dados antes de criar o projeto." : "Cole um email ou junte um PDF ou fotografia. O assistente preenche o projeto por si.") +
       '</div></div><button class="btn ghost" data-imp-close aria-label="Fechar">✕</button></div><div class="d-body">';
     if (imp.step === "input") {
+      if (demoImport) h += '<div class="banner" style="margin:0">Demonstração: aqui a leitura é simulada e só reconhece dados simples. Na versão real, o assistente lê qualquer email, PDF ou fotografia. <button class="btn sm" id="imp-sample">Usar email de exemplo</button></div>';
       h += '<div class="panel"><div class="field"><label for="imp-text">Email ou mensagem do cliente / parceiro</label><textarea class="msg" id="imp-text" style="min-height:200px;background:var(--surface)" placeholder="Cole aqui o email completo, incluindo assinatura e contactos.">' + esc(imp.text) + "</textarea></div>" +
         '<label class="drop" id="imp-drop" for="imp-file"><b>Juntar ficheiros</b><span>PDF, fotografia' + (imagesOK ? "" : " (indisponível)") + ' ou email guardado (.eml). Arraste para aqui ou clique.</span><input type="file" id="imp-file" multiple accept=".pdf,.eml,.txt,application/pdf,message/rfc822,text/plain' + (imagesOK ? ",image/*" : "") + '"></label>';
       if (imp.files.length) h += '<div class="chips">' + imp.files.map(function (f, i) {
@@ -1001,6 +1002,7 @@ td.num { font-variant-numeric: tabular-nums; }
     if (t.id === "btn-import") { openImport(); return; }
     if (imp) {
       if (t.id === "imp-read") { readImport(); return; }
+      if (t.id === "imp-sample") { imp.text = demoImport.sampleEmail; renderImport(); return; }
       if (t.id === "imp-stop") { imp.ctl.abort(); return; }
       if (t.id === "imp-back") { imp.step = "input"; renderImport(); return; }
       if (t.id === "imp-create") { createFromImport(); return; }
@@ -1131,5 +1133,11 @@ td.num { font-variant-numeric: tabular-nums; }
       }, function () {});
     }
   } catch (e) {}
+  // The standalone demo has no Claude: it sets window.FLUXO_DEMO_IMPORT to a simulated reader.
+  if (!sampleFn && window.FLUXO_DEMO_IMPORT && !(window.claude && window.claude.use)) {
+    demoImport = window.FLUXO_DEMO_IMPORT;
+    sampleFn = { json: demoImport.json };
+    renderHead();
+  }
 })();
 </script>

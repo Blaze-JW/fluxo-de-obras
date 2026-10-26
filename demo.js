@@ -17,3 +17,60 @@ window.FLUXO_DEMO = function () {
     proj("ex7", "P-2026-099", 5, { clientName: "Pedro Almeida (exemplo)", clientType: "Cliente final", phone: "918 000 099", pieceType: "Revestimento de cozinha", stone: "Mármore Branco Carrara", quoteValue: 1650, quoteAccepted: true, address: "Rua Formosa 20, Porto", measureDate: d(-46), area: 5, thickness: "2 cm", finish: "Polido", edge: "Reto", slab: "Chapa 1840-C", cutDone: true, installDate: d(-16), installDone: true, clientSignoff: true }, d(-14), -55)
   ];
 };
+
+// Simulated "Importar pedido" for the demo: there is no AI here, so the sample email
+// returns a prepared reading and other text gets a simple pattern-based guess.
+window.FLUXO_DEMO_IMPORT = (function () {
+  function d(n) { var x = new Date(); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
+  function longDate(iso) { return new Date(iso + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "long" }); }
+  var install = d(21);
+  var sampleEmail =
+    "De: Carla Nunes <encomendas@cozinhasdonorte.pt>\n" +
+    "Assunto: Pedido de orçamento - bancada cliente Tiago Moreira\n\n" +
+    "Bom dia,\n\n" +
+    "Envio novo pedido para um cliente nosso, o Sr. Tiago Moreira (tlm 919 555 214, tiago.moreira@email.pt).\n" +
+    "A obra é na Rua de Santa Catarina 310, 2.º Esq, Porto.\n\n" +
+    "Bancada de cozinha em L em quartzo Branco Calacatta, 3 cm, acabamento polido, rebordo boleado. Área aproximada 4,2 m2.\n" +
+    "Lava-loiça Blanco Subline 500-U, montado por baixo. Placa com recorte 560 x 490 mm. 1 furo para torneira de 35 mm.\n" +
+    "Inclui frontão de 10 cm ao longo da parede do lava-loiça.\n\n" +
+    "O cliente gostava de ter a montagem até " + longDate(install) + ". Podem enviar orçamento?\n\n" +
+    "Obrigada,\nCarla Nunes\nCozinhas do Norte, Lda\n220 123 456";
+  var sampleResult = {
+    clientName: "Tiago Moreira", clientType: "Loja parceira", partner: "Cozinhas do Norte, Lda", phone: "919 555 214", email: "tiago.moreira@email.pt",
+    pieceType: "Bancada de cozinha", stone: "Quartzo Branco Calacatta", address: "Rua de Santa Catarina 310, 2.º Esq, Porto",
+    area: 4.2, thickness: "3 cm", finish: "Polido", edge: "Boleado", sinkModel: "Blanco Subline 500-U", sinkMount: "Por baixo (sub-montado)",
+    hobCutout: "560 × 490 mm", tapHoles: "1 furo Ø35 mm", dueDate: install,
+    notes: "Bancada em L. Inclui frontão de 10 cm ao longo da parede do lava-loiça. Pedido enviado por Carla Nunes (Cozinhas do Norte), 220 123 456.",
+    summary: "Bancada em L em quartzo com lava-loiça sub-montado, via Cozinhas do Norte"
+  };
+  var STONES = ["quartzo", "granito", "mármore", "marmore", "ardósia", "ardosia", "calcário", "calcario", "silestone", "dekton", "neolith"];
+  var PIECES = [["bancada", "Bancada de cozinha"], ["base de duche", "Base de duche"], ["duche", "Base de duche"], ["mesa", "Mesa de jantar"], ["casa de banho", "Revestimento de casa de banho"], ["revestimento", "Revestimento de cozinha"]];
+  function guess(text) {
+    var low = text.toLowerCase(), r = {}, m;
+    if ((m = /(?:\+351\s?)?\b(9\d{2}|2\d{2})[\s.]?\d{3}[\s.]?\d{3}\b/.exec(text))) r.phone = m[0].trim();
+    if ((m = /[\w.+-]+@[\w-]+\.[\w.]+/.exec(text))) r.email = m[0];
+    if ((m = /(?:[Nn]ome|[Cc]liente|[Ss]ra?\.?|[Dd]\.)\s*:?\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+)+)/.exec(text))) r.clientName = m[1];
+    for (var i = 0; i < PIECES.length; i++) if (low.indexOf(PIECES[i][0]) >= 0) { r.pieceType = PIECES[i][1]; break; }
+    for (var j = 0; j < STONES.length; j++) {
+      var k = low.indexOf(STONES[j]);
+      if (k >= 0) { r.stone = text.substr(k, 40).split(/[,.;\n]/)[0].replace(/\s+\d.*$/, "").trim(); r.stone = r.stone.charAt(0).toUpperCase() + r.stone.slice(1); break; }
+    }
+    if ((m = /(\d+(?:[.,]\d+)?)\s*m(?:2|²)/i.exec(text))) r.area = m[1];
+    if ((m = /\b([23])\s*cm\b/.exec(text))) r.thickness = m[1] + " cm";
+    ["Polido", "Amaciado", "Escovado", "Flameado"].forEach(function (f) { if (low.indexOf(f.toLowerCase()) >= 0) r.finish = f; });
+    if ((m = /\b(?:rua|av\.?|avenida|travessa|largo|praça)\s[^\n]{3,80}/i.exec(text))) r.address = m[0].trim();
+    r.summary = "Leitura simulada da demonstração";
+    return r;
+  }
+  return {
+    sampleEmail: sampleEmail,
+    json: function (prompt, opts) {
+      var body = prompt.slice(prompt.lastIndexOf("ORDER:\n") + 7);
+      var result = body.indexOf("Tiago Moreira") >= 0 && body.indexOf("Cozinhas do Norte") >= 0 ? sampleResult : guess(body);
+      return new Promise(function (ok, fail) {
+        var timer = setTimeout(function () { ok(JSON.parse(JSON.stringify(result))); }, 1800);
+        if (opts && opts.signal) opts.signal.addEventListener("abort", function () { clearTimeout(timer); fail({ code: "cancelled" }); });
+      });
+    }
+  };
+})();
