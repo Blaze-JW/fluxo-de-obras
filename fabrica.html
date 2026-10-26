@@ -52,7 +52,7 @@ header > * { pointer-events: auto; }
 .zone .zt { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
 .zone .zt b { margin-left: auto; font-family: var(--f-mono); font-size: 13px; }
 .zone .zs { color: var(--muted); font-size: 13px; }
-.zone .guess { font-size: 11px; color: var(--warn); background: var(--warn-soft); border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+.zone .guess, .zone .zh .guess { font-size: 11px; color: var(--warn); background: var(--warn-soft); border-radius: 4px; padding: 1px 5px; font-weight: 600; }
 .jobs { margin: 6px 0 0; padding: 0; list-style: none; }
 .jobs li button { width: 100%; text-align: left; font: inherit; font-size: 13px; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-top: 4px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
 .jobs li button:hover { border-color: var(--accent); }
@@ -64,6 +64,11 @@ header > * { pointer-events: auto; }
 .lbl { position: absolute; transform: translate(-50%, -100%); background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font: 600 12px var(--f-body); white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.12); pointer-events: auto; cursor: pointer; }
 .lbl b { font-family: var(--f-mono); color: var(--accent); margin-left: 4px; }
 .lbl.on { border-color: var(--accent); }
+.lbl.alert { background: var(--bad); color: #fff; border-color: var(--bad); }
+.lbl.alert b { color: #fff; }
+.zone.alert { background: var(--bad-soft); }
+.zone.alert .zt { color: var(--bad); }
+.jobs .why { display: block; color: var(--muted); font-size: 12px; }
 #card { position: fixed; right: 16px; top: 76px; width: 300px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
 #card[hidden] { display: none; }
 #card .ref { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
@@ -128,21 +133,27 @@ const today = new Date().toISOString().slice(0, 10);
 const late = (p) => p.dueDate && p.dueDate < today && p.stage < 5;
 const waiting = (p) => !!p.waitingSince || !!p.issue;
 const status = (p) => late(p) ? "bad" : waiting(p) ? "warn" : "";
+// Why a job is in the attention area (empty when it is where its stage says).
+const reasons = (p) => p.stage >= 5 ? [] : [late(p) && "Fora do prazo", p.issue && "Problema reportado", p.waitingSince && "À espera do cliente"].filter(Boolean);
 
 // ---------- Site plan: pixel coordinates measured on the satellite image (~0.1 m per pixel) ----------
 const S = 0.1, CX = 515, CY = 320;
 const X = (px) => (px - CX) * S, Z = (py) => (py - CY) * S;
 const rect = (x1, y1, x2, y2) => ({ x: X((x1 + x2) / 2), z: Z((y1 + y2) / 2), w: (x2 - x1) * S, d: (y2 - y1) * S });
 
-// Zones: where each stage of the process happens. Functions are guesses until the factory confirms them.
+// Zones, as the factory described them. The halls are split in halves: the half nearer the road and the
+// entrance (east) and the far half (west).
 const ZONES = [
-  { id: "escritorio", name: "Escritório", sub: "Orçamentos, confirmação e marcação de medições", guess: true, r: rect(55, 65, 135, 170), stages: [0, 1, 2], h: 4 },
-  { id: "corte", name: "Pavilhão 1 · Corte", sub: "Chapas a cortar (Produção)", guess: true, r: rect(12, 212, 615, 328), h: 7 },
-  { id: "acabamento", name: "Pavilhão 2 · Acabamento", sub: "Peças cortadas, à espera de montagem", guess: true, r: rect(12, 410, 625, 545), h: 8 },
-  { id: "stock", name: "Parque de chapas", sub: "Stock de pedra ao ar livre", r: rect(140, 25, 860, 200) },
-  { id: "cargas", name: "Cargas e saída", sub: "Peças prontas para montagem em obra (Montagem)", guess: true, r: rect(640, 210, 860, 400), stages: [4] }
+  { id: "atencao", name: "! Atenção", sub: "Fora do prazo, à espera do cliente ou com problema reportado", r: rect(650, 412, 845, 518), alert: true },
+  { id: "showroom", name: "Showroom e escritório", sub: "Pavilhão 2, lado da entrada · orçamentos, confirmação e medições", r: rect(318, 410, 625, 545), h: 7.5, hall: true },
+  { id: "cortes", name: "Cortes", sub: "Pavilhão 1, lado da entrada · chapas a cortar", r: rect(313, 212, 615, 328), h: 7, hall: true },
+  { id: "especializada", name: "Produção especializada", sub: "Pavilhão 2, lado do fundo · peças cortadas em acabamento", r: rect(12, 410, 318, 545), h: 7.5, hall: true },
+  { id: "montagem", name: "Montagem", sub: "Pavilhão 1, lado do fundo · peças prontas para montar", r: rect(12, 212, 313, 328), h: 7, hall: true },
+  { id: "concluidos", name: "Concluídos", sub: "Onde ficam as peças terminadas", guess: true, r: rect(55, 65, 135, 170), h: 4 },
+  { id: "inventario", name: "Inventário e parque de chapas", sub: "Stock de pedra ao ar livre, no parque e junto à entrada", r: rect(140, 25, 860, 200) }
 ];
-const zoneOf = (p) => p.stage <= 2 ? "escritorio" : p.stage === 3 ? (p.specs && p.specs.cutDone ? "acabamento" : "corte") : p.stage === 4 ? "cargas" : null;
+const ZONE = Object.fromEntries(ZONES.map((z) => [z.id, z]));
+const zoneOf = (p) => reasons(p).length ? "atencao" : p.stage <= 2 ? "showroom" : p.stage === 3 ? (p.specs && p.specs.cutDone ? "especializada" : "cortes") : p.stage === 4 ? "montagem" : "concluidos";
 
 // ---------- Scene ----------
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -228,6 +239,29 @@ const buildings = {
   corte: gableHall(rect(12, 212, 615, 328), 7, M.roofBrown, M.roofRed),
   acabamento: barrelHall(rect(12, 410, 625, 545), 7.5)
 };
+// A dark band across each roof marks where one half ends and the other begins.
+{
+  const r1 = rect(12, 212, 615, 328), half = r1.d / 2, rise = 2.6, ang = Math.atan2(rise, half), slope = Math.hypot(half, rise);
+  [-1, 1].forEach((s) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, slope + 0.4), M.dark);
+    b.position.set(X(313), 7 + rise / 2 + 0.2, Z(270) + s * half / 2); b.rotation.x = s * ang; scene.add(b);
+  });
+  const r2 = rect(12, 410, 625, 545);
+  const arc = new THREE.Mesh(new THREE.CylinderGeometry(r2.d / 2 + 0.15, r2.d / 2 + 0.15, 0.7, 28, 1, true, 0, Math.PI), M.dark);
+  arc.material.side = THREE.DoubleSide; arc.rotation.z = Math.PI / 2; arc.scale.set(0.34, 1, 1); arc.position.set(X(318), 7.5, Z(477)); scene.add(arc);
+}
+// The attention area: a red-edged pad on the open yard with a warning sign.
+const att = ZONE.atencao.r;
+flat({ x: att.x, z: att.z, w: att.w, d: att.d }, mat(0xc0392b, { emissive: 0xc0392b, emissiveIntensity: 0.25 }), 0.05);
+flat({ x: att.x, z: att.z, w: att.w - 1, d: att.d - 1 }, mat(0xf3e2df), 0.07);
+const sign = new THREE.Group();
+box(0.18, 4.2, 0.18, M.dark, 0, 0, 0, sign);
+const signShape = new THREE.Shape([new THREE.Vector2(-1.5, 0), new THREE.Vector2(1.5, 0), new THREE.Vector2(0, 2.6)]);
+const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(signShape, { depth: 0.12, bevelEnabled: false }), mat(0xe8b02a));
+plate.position.set(0, 4.1, 0.1); sign.add(plate);
+box(0.28, 1.1, 0.05, M.dark, 0, 4.85, 0.25, sign); box(0.28, 0.26, 0.05, M.dark, 0, 4.4, 0.25, sign);
+sign.position.set(att.x - att.w / 2 + 1.5, 0, att.z - att.d / 2 + 1.5); sign.rotation.y = -0.5; scene.add(sign);
+
 const office = new THREE.Group(); scene.add(office);
 const o = rect(55, 65, 135, 170);
 box(o.w, 3.6, o.d, M.wall, o.x, 0, o.z, office);
@@ -280,22 +314,22 @@ const pickables = [];
 const STATUS_COLOR = { "": 0x1f5f5b, warn: 0xd08a12, bad: 0xc0392b };
 function jobSpot(z, i) {
   const r = ZONES.find((q) => q.id === z).r;
-  if (z === "escritorio") return new THREE.Vector3(r.x + r.w / 2 + 4 + (i % 2) * 4.4, 0, r.z - 6 + Math.floor(i / 2) * 6.4);
-  if (z === "cargas") return new THREE.Vector3(r.x - 4 + (i % 3) * 4.4, 0, r.z + 6 + Math.floor(i / 3) * 6.4);
-  // Inside a hall: show them floating above the roof line so they stay visible.
-  return new THREE.Vector3(r.x - r.w / 2 + 12 + i * 9, 0, r.z);
+  if (z === "concluidos") return new THREE.Vector3(r.x + r.w / 2 + 4 + (i % 2) * 4.4, 0, r.z - 6 + Math.floor(i / 2) * 6.4);
+  if (z === "atencao") return new THREE.Vector3(r.x - r.w / 2 + 5 + (i % 4) * 4.6, 0, r.z - r.d / 2 + 4 + Math.floor(i / 4) * 6.4);
+  // Inside a hall: float above the roof of that half so they stay visible.
+  return new THREE.Vector3(r.x - r.w / 2 + 5 + (i % 6) * 4.6, 0, r.z + (Math.floor(i / 6) % 2 ? 3 : -3));
 }
 const counts = {};
 projects.forEach((p) => {
-  const z = zoneOf(p); if (!z) return;
+  const z = zoneOf(p);
   const i = counts[z] = (counts[z] || 0); counts[z]++;
-  const pos = jobSpot(z, i), inHall = z === "corte" || z === "acabamento";
+  const pos = jobSpot(z, i), inHall = !!ZONE[z].hall;
   const g = new THREE.Group();
   const slab = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.5, 5), mat(STONE[i % STONE.length], { flatShading: false, roughness: 0.4 }));
   slab.castShadow = true; g.add(slab);
   const tag = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.3, 5.3), mat(STATUS_COLOR[status(p)], { emissive: STATUS_COLOR[status(p)], emissiveIntensity: 0.35 }));
   tag.position.y = -0.38; g.add(tag);
-  const baseY = inHall ? ZONES.find((q) => q.id === z).h + 6 : 1.6;
+  const baseY = inHall ? ZONE[z].h + 6 : 1.6;
   if (inHall) {
     const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, baseY - 3), M.dark);
     pin.position.y = -(baseY - 3) / 2; g.add(pin);
@@ -313,12 +347,11 @@ let selZone = null, selJob = null;
 function jobsIn(z) { return projects.filter((p) => zoneOf(p) === z); }
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 function renderPanel() {
-  const done = projects.filter((p) => p.stage === 5).length;
   zonesEl.innerHTML = ZONES.map((z) => {
     const js = jobsIn(z.id);
-    return `<div class="zone${selZone === z.id ? " on" : ""}"><button class="zh" data-zone="${z.id}"><div class="zt">${esc(z.name)}${z.guess ? ' <span class="guess">a confirmar</span>' : ""}<b>${z.id === "stock" ? "" : js.length}</b></div><div class="zs">${esc(z.sub)}</div></button>` +
-      (js.length ? `<ul class="jobs">${js.map((p) => `<li><button data-job="${esc(p.id)}"><i class="dot ${status(p)}"></i>${esc(p.ref)} · ${esc(p.specs.clientName || "")}</button></li>`).join("")}</ul>` : "") + "</div>";
-  }).join("") + `<div class="zone" style="cursor:default"><div class="zt">Concluídos<b>${done}</b></div><div class="zs">Já entregues e fechados, fora do mapa</div></div>`;
+    return `<div class="zone${selZone === z.id ? " on" : ""}${z.alert ? " alert" : ""}"><button class="zh" data-zone="${z.id}"><div class="zt">${esc(z.name)}${z.guess ? ' <span class="guess">a confirmar</span>' : ""}<b>${z.id === "inventario" ? "" : js.length}</b></div><div class="zs">${esc(z.sub)}</div></button>` +
+      (js.length ? `<ul class="jobs">${js.map((p) => `<li><button data-job="${esc(p.id)}"><i class="dot ${status(p)}"></i><span>${esc(p.ref)} · ${esc(p.specs.clientName || "")}${z.alert ? `<small class="why">${esc(STAGES[p.stage])} · ${esc(reasons(p).join(" · "))}</small>` : ""}</span></button></li>`).join("")}</ul>` : z.alert ? '<div class="zs" style="margin-top:6px">Nada a precisar de atenção.</div>' : "") + "</div>";
+  }).join("");
 }
 renderPanel();
 
@@ -326,10 +359,11 @@ renderPanel();
 const labelsEl = document.getElementById("labels");
 const labelEls = ZONES.map((z) => {
   const el = document.createElement("div");
-  el.className = "lbl"; el.dataset.zone = z.id;
-  el.innerHTML = esc(z.name) + (z.id === "stock" ? "" : `<b>${jobsIn(z.id).length}</b>`);
+  el.className = "lbl" + (z.alert ? " alert" : ""); el.dataset.zone = z.id;
+  el.innerHTML = esc(z.name) + (z.id === "inventario" ? "" : `<b>${jobsIn(z.id).length}</b>`);
   labelsEl.appendChild(el);
-  return { el, pos: new THREE.Vector3(z.r.x, (z.h || 2) + (z.id === "corte" || z.id === "acabamento" ? 3 : 2), z.id === "stock" ? z.r.z - 2 : z.r.z - (z.id === "escritorio" ? 0 : z.r.d / 2 - 1)) };
+  const y = z.hall ? z.h + 3.5 : (z.h || 1) + (z.id === "concluidos" ? 5 : 2);
+  return { el, pos: new THREE.Vector3(z.id === "inventario" ? X(260) : z.r.x, y, z.id === "inventario" ? Z(110) : z.r.z) };
 });
 const v = new THREE.Vector3();
 function placeLabels() {
@@ -359,10 +393,10 @@ function selectJob(id) {
   const g = jobGroup.children.find((c) => c.userData.p.id === id);
   if (!g) return;
   selJob = g; selZone = zoneOf(g.userData.p); renderPanel();
-  const p = g.userData.p, s = p.specs || {}, st = status(p);
+  const p = g.userData.p, s = p.specs || {};
   card.innerHTML = `<div style="display:flex;gap:8px;align-items:start"><div class="grow"><div class="ref">${esc(p.ref)}</div><h3 style="font-size:17px">${esc(s.clientName || "Sem nome")}</h3></div><button class="btn" id="card-x" aria-label="Fechar">✕</button></div>` +
-    `<div style="margin-top:6px"><span class="chip">${esc(STAGES[p.stage])}</span> ${st === "bad" ? '<span class="chip bad">Fora do prazo</span>' : st === "warn" ? '<span class="chip warn">' + (p.issue ? "Problema reportado" : "À espera do cliente") + "</span>" : ""}</div>` +
-    `<dl><dt>Peça</dt><dd>${esc(s.pieceType || "—")}</dd><dt>Pedra</dt><dd>${esc(s.stone || "—")}</dd>${s.area ? `<dt>Área</dt><dd>${esc(s.area)} m²</dd>` : ""}<dt>Prazo</dt><dd>${p.dueDate ? new Date(p.dueDate + "T12:00").toLocaleDateString("pt-PT") : "—"}</dd>${s.installDate ? `<dt>Montagem</dt><dd>${new Date(s.installDate + "T12:00").toLocaleDateString("pt-PT")}</dd>` : ""}${p.issue ? `<dt>Problema</dt><dd>${esc(p.issue.text)}</dd>` : ""}</dl>` +
+    `<div style="margin-top:6px"><span class="chip">${esc(STAGES[p.stage])}</span> ${reasons(p).map((r) => `<span class="chip ${r === "Fora do prazo" ? "bad" : "warn"}">${esc(r)}</span>`).join(" ")}</div>` +
+    `<dl><dt>Zona</dt><dd>${esc(ZONE[zoneOf(p)].name)}</dd><dt>Peça</dt><dd>${esc(s.pieceType || "—")}</dd><dt>Pedra</dt><dd>${esc(s.stone || "—")}</dd>${s.area ? `<dt>Área</dt><dd>${esc(s.area)} m²</dd>` : ""}<dt>Prazo</dt><dd>${p.dueDate ? new Date(p.dueDate + "T12:00").toLocaleDateString("pt-PT") : "—"}</dd>${s.installDate ? `<dt>Montagem</dt><dd>${new Date(s.installDate + "T12:00").toLocaleDateString("pt-PT")}</dd>` : ""}${p.issue ? `<dt>Problema</dt><dd>${esc(p.issue.text)}</dd>` : ""}</dl>` +
     `<a class="btn primary" href="./">Abrir no Fluxo de Obras</a>`;
   card.hidden = false;
   flyTo(g.position.clone().setY(g.userData.baseY / 2), 42);
