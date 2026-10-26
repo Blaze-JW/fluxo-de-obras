@@ -200,6 +200,14 @@ td.num { font-variant-numeric: tabular-nums; }
 .ficha dt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .ficha dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .ficha .wide { grid-column: 1 / -1; }
+a.btn { text-decoration: none; color: inherit; }
+.swatch { display: inline-block; vertical-align: middle; border-radius: 6px; border: 1px solid var(--line); object-fit: cover; flex: none; background: var(--surface-2); }
+.stone-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.stone-preview { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
+.stone-preview[hidden] { display: none; }
+.stone-preview img { width: 132px; height: 84px; }
+.stone-preview span { font-size: 12px; color: var(--muted); }
+.d-head .swatch { width: 52px; height: 52px; border-radius: 8px; }
 .job-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .issue { background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
 .report { display: grid; gap: 6px; }
@@ -266,6 +274,7 @@ td.num { font-variant-numeric: tabular-nums; }
 <main class="wrap" id="view"></main>
 <div id="drawer-root"></div>
 <div id="modal-root"></div>
+<datalist id="stone-list"></datalist>
 <div id="toast-root"></div>
 
 <script>
@@ -295,7 +304,7 @@ td.num { font-variant-numeric: tabular-nums; }
     { key: "phone", label: "Telefone", type: "tel", stage: 0, who: "cliente" },
     { key: "email", label: "Email", type: "email", stage: -1, who: "cliente" },
     { key: "pieceType", label: "Tipo de peça", type: "select", options: PIECES, stage: 0, who: "cliente" },
-    { key: "stone", label: "Pedra / material", type: "text", stage: 0, who: "cliente", ph: "ex.: Granito Preto Zimbabwe" },
+    { key: "stone", label: "Pedra / material", type: "text", stage: 0, who: "cliente", ph: "ex.: Granito Preto Zimbabwe", full: true },
     { key: "quoteValue", label: "Valor do orçamento (€)", type: "number", stage: 0, who: "equipa" },
     { key: "quoteAccepted", label: "Orçamento aceite pelo cliente", type: "check", stage: 1, who: "cliente" },
     { key: "address", label: "Morada da obra", type: "text", stage: 1, who: "cliente", full: true },
@@ -343,6 +352,118 @@ td.num { font-variant-numeric: tabular-nums; }
   var store = null;
   var localMode = false;
   var chains = {};
+  // ---------- Stone swatches: an illustrative picture of each stone, drawn in the browser ----------
+  // kind: marble (veins), granite (grains), quartz (fine grain), slate (layers), limestone (soft spots).
+  var STONE_CATALOG = [
+    { name: "Mármore Branco Carrara", kind: "marble", base: "#e9e8e4", vein: "#8f949a", veins: 9, bold: 0.5 },
+    { name: "Mármore Calacatta", kind: "marble", base: "#f3f1ec", vein: "#8b7d6c", veins: 4, bold: 1.6 },
+    { name: "Mármore Estremoz", kind: "marble", base: "#eee5d8", vein: "#bfa98f", veins: 6, bold: 0.8 },
+    { name: "Mármore Rosa Aurora", kind: "marble", base: "#e6c4b3", vein: "#b9776a", veins: 7, bold: 1 },
+    { name: "Mármore Negro Marquina", kind: "marble", base: "#1c1c1e", vein: "#e8e6e1", veins: 6, bold: 0.7 },
+    { name: "Mármore Verde Guatemala", kind: "marble", base: "#24453a", vein: "#cfe0d6", veins: 10, bold: 0.6 },
+    { name: "Travertino Romano", kind: "limestone", base: "#dccbb0", spot: "#bfa682", layers: true },
+    { name: "Calcário Moleanos", kind: "limestone", base: "#e2d6bf", spot: "#c4b393" },
+    { name: "Granito Preto Zimbabwe", kind: "granite", base: "#19191b", grains: ["#2b2b2e", "#3a3a3e", "#5b5b60"], density: 0.5 },
+    { name: "Granito Branco Cristal", kind: "granite", base: "#d8d6d1", grains: ["#202022", "#6f6f73", "#a7a6a2", "#efeeea"], density: 1 },
+    { name: "Granito Cinza Pinhel", kind: "granite", base: "#a9a8a6", grains: ["#3c3c3f", "#77777b", "#d4d3cf"], density: 1 },
+    { name: "Granito Rosa Porriño", kind: "granite", base: "#c99b8a", grains: ["#2a2626", "#e0c2b5", "#8f6e64", "#f0e6e0"], density: 1 },
+    { name: "Granito Amarelo Real", kind: "granite", base: "#d6c19a", grains: ["#3b342b", "#a58f6a", "#efe2c9"], density: 0.9 },
+    { name: "Quartzo Branco Calacatta", kind: "quartz", base: "#f5f3ef", vein: "#9a8d7c", veins: 3, bold: 1.4 },
+    { name: "Quartzo Branco Puro", kind: "quartz", base: "#f6f6f4" },
+    { name: "Quartzo Cinza", kind: "quartz", base: "#9fa1a3" },
+    { name: "Quartzo Preto", kind: "quartz", base: "#232325" },
+    { name: "Ardósia", kind: "slate", base: "#3a3f44" }
+  ];
+  function plainText(x) { return String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); }
+  function stoneSpec(name) {
+    var n = plainText(name);
+    if (!n) return null;
+    var exact = STONE_CATALOG.find(function (c) { return plainText(c.name) === n; });
+    if (exact) return exact;
+    // Best partial match: the catalog entry sharing the most words with what was typed.
+    var words = n.split(/\s+/).filter(function (w) { return w.length > 2; }), best = null, score = 0;
+    STONE_CATALOG.forEach(function (c) {
+      var cw = plainText(c.name).split(/\s+/), sc = words.filter(function (w) { return cw.indexOf(w) >= 0; }).length;
+      if (sc > score && sc >= Math.min(2, words.length)) { score = sc; best = c; }
+    });
+    if (best) return best;
+    var kind = /granit/.test(n) ? "granite" : /quartz|silestone|compac|caesar|dekton|neolith|ceram|porcel/.test(n) ? "quartz" : /ardosia|slate/.test(n) ? "slate" : /calcar|travert|moleanos|lioz|limestone/.test(n) ? "limestone" : /marmor|marble/.test(n) ? "marble" : "";
+    if (!kind) return null;
+    var base = /pret|negr|black|nero/.test(n) ? "#1f1f21" : /cinz|grey|gris/.test(n) ? "#9c9d9f" : /rosa|pink/.test(n) ? "#d9b2a4" : /verde|green/.test(n) ? "#3d5a4c" : /castanh|marrom|brown|cafe/.test(n) ? "#6b5141" : /bege|creme|cream|amarel|beige/.test(n) ? "#dccbb0" : /azul|blue/.test(n) ? "#5b6d84" : kind === "slate" ? "#3a3f44" : "#ecebe7";
+    var dark = parseInt(base.slice(1, 3), 16) < 110;
+    return { kind: kind, base: base, vein: dark ? "#d9d6d0" : "#8f8a84", veins: 6, bold: 0.8, spot: "#bfa682",
+      grains: dark ? ["#3a3a3e", "#5d5d62", "#8a8a8f"] : ["#2a2a2c", "#77777b", "#c7c6c2"], density: 0.9 };
+  }
+  var swatchCache = {};
+  function stoneDataURL(name, w, h) {
+    var spec = stoneSpec(name);
+    if (!spec) return "";
+    var key = plainText(name) + "|" + w + "x" + h;
+    if (swatchCache[key]) return swatchCache[key];
+    var k = 2, W = w * k, H = h * k, c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    var g = c.getContext("2d");
+    if (!g) return "";
+    // Seeded from the stone, not the project, so the same stone always looks the same.
+    var seed = 0, sname = plainText(spec.name || name); for (var i = 0; i < sname.length; i++) seed = (seed * 31 + sname.charCodeAt(i)) | 0;
+    var rnd = function () { seed = (seed + 0x6D2B79F5) | 0; var t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    var rgba = function (hex, a) { return "rgba(" + parseInt(hex.slice(1, 3), 16) + "," + parseInt(hex.slice(3, 5), 16) + "," + parseInt(hex.slice(5, 7), 16) + "," + a + ")"; };
+    var dark = parseInt(spec.base.slice(1, 3), 16) < 110;
+    g.fillStyle = spec.base; g.fillRect(0, 0, W, H);
+    // Soft clouds of light and shade, common to every stone.
+    for (var j = 0; j < 26; j++) {
+      var x = rnd() * W, y = rnd() * H, r = (0.15 + rnd() * 0.45) * Math.max(W, H);
+      var grd = g.createRadialGradient(x, y, 0, x, y, r);
+      grd.addColorStop(0, rnd() < 0.5 ? "rgba(255,255,255," + (dark ? 0.04 : 0.12) + ")" : "rgba(0,0,0," + (dark ? 0.12 : 0.05) + ")");
+      grd.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = grd; g.fillRect(0, 0, W, H);
+    }
+    function veins(count, color, bold) {
+      for (var v = 0; v < count; v++) {
+        var px = rnd() * W * 1.2 - W * 0.1, py = -10, ang = Math.PI / 2 + (rnd() - 0.5) * 1.3, width = (0.4 + rnd() * 1.6) * bold * k;
+        g.beginPath(); g.moveTo(px, py);
+        while (py < H + 10 && px > -W * 0.3 && px < W * 1.3) {
+          ang += (rnd() - 0.5) * 0.5; px += Math.cos(ang) * 6 * k; py += Math.abs(Math.sin(ang)) * 6 * k + 1; g.lineTo(px, py);
+        }
+        g.strokeStyle = rgba(color, 0.25 + rnd() * 0.55); g.lineWidth = width; g.lineJoin = "round"; g.stroke();
+        if (rnd() < 0.5) { g.strokeStyle = rgba(color, 0.15); g.lineWidth = width * 3; g.stroke(); }
+      }
+    }
+    if (spec.kind === "marble") veins(spec.veins, spec.vein, spec.bold);
+    if (spec.kind === "granite") {
+      var n = Math.round(W * H / (14 * k) * spec.density);
+      for (var q = 0; q < n; q++) {
+        g.fillStyle = spec.grains[Math.floor(rnd() * spec.grains.length)];
+        var sz = (0.6 + rnd() * rnd() * 3.2) * k;
+        g.beginPath(); g.ellipse(rnd() * W, rnd() * H, sz, sz * (0.5 + rnd() * 0.5), rnd() * 3, 0, Math.PI * 2); g.fill();
+      }
+    }
+    if (spec.kind === "quartz") {
+      for (var z = 0; z < W * H / (5 * k); z++) { g.fillStyle = rnd() < 0.5 ? "rgba(255,255,255," + (dark ? 0.12 : 0.5) + ")" : "rgba(0,0,0," + (dark ? 0.25 : 0.06) + ")"; g.fillRect(rnd() * W, rnd() * H, k * 0.8, k * 0.8); }
+      if (spec.veins) veins(spec.veins, spec.vein, spec.bold);
+    }
+    if (spec.kind === "slate") {
+      for (var l = 0; l < 40; l++) { var ly = rnd() * H; g.fillStyle = rnd() < 0.5 ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.12)"; g.fillRect(0, ly, W, (1 + rnd() * 6) * k); }
+    }
+    if (spec.kind === "limestone") {
+      if (spec.layers) for (var t2 = 0; t2 < 18; t2++) { g.fillStyle = rgba(spec.spot, 0.18 + rnd() * 0.2); g.fillRect(0, rnd() * H, W, (0.5 + rnd() * 3) * k); }
+      for (var f = 0; f < W * H / (60 * k); f++) { g.fillStyle = rgba(spec.spot, 0.3 + rnd() * 0.5); g.beginPath(); g.arc(rnd() * W, rnd() * H, (0.4 + rnd() * 1.6) * k, 0, Math.PI * 2); g.fill(); }
+    }
+    // A touch of polish: a faint diagonal sheen.
+    var sheen = g.createLinearGradient(0, 0, W, H);
+    sheen.addColorStop(0, "rgba(255,255,255,0.10)"); sheen.addColorStop(0.5, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(0,0,0,0.06)");
+    g.fillStyle = sheen; g.fillRect(0, 0, W, H);
+    return (swatchCache[key] = c.toDataURL("image/jpeg", 0.86));
+  }
+  function stoneImg(name, w, h) {
+    var src = stoneDataURL(name, w, h);
+    return src ? '<img class="swatch" src="' + src + '" width="' + w + '" height="' + h + '" alt="">' : "";
+  }
+  function stonePreview(name, id) {
+    var src = stoneDataURL(name, 132, 84);
+    return '<div class="stone-preview" id="' + id + '"' + (src ? "" : " hidden") + '><img class="swatch" src="' + src + '" width="132" height="84" alt="Aspeto aproximado da pedra"><span>Aspeto aproximado.<br>Cada chapa é única.</span></div>';
+  }
+
   var LS_KEY = "fluxo-obras-local";
 
   function localLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch (e) { return []; } }
@@ -495,7 +616,7 @@ td.num { font-variant-numeric: tabular-nums; }
     h += '<div class="table-wrap"><table><thead><tr><th>Ref.</th><th>Cliente</th><th>Peça / pedra</th><th>Etapa</th><th>Estado</th><th>Prazo</th><th>Orçamento</th></tr></thead><tbody>';
     if (!rows.length) h += '<tr><td colspan="7" class="empty">Nenhum projeto corresponde a estes filtros.</td></tr>';
     rows.forEach(function (p) {
-      h += '<tr data-open="' + esc(p.id) + '"><td class="mono">' + esc(p.ref) + "</td><td><b>" + esc(p.specs.clientName || "Sem nome") + "</b><br><span style=\"color:var(--muted);font-size:13px\">" + esc(p.specs.clientType || "") + (hasPartner(p) && p.specs.partner ? " · " + esc(p.specs.partner) : "") + "</span></td><td>" + esc(p.specs.pieceType || "—") + "<br><span style=\"color:var(--muted);font-size:13px\">" + esc(p.specs.stone || "") + "</span></td><td>" + STAGES[p.stage] + '</td><td><span class="chips">' + (p.stage < 5 ? projectFlags(p) : '<span class="chip ok">Concluído</span>') + '</span></td><td class="num">' + fmtDate(p.dueDate) + '</td><td class="num">' + euro(p.specs.quoteValue) + "</td></tr>";
+      h += '<tr data-open="' + esc(p.id) + '"><td class="mono">' + esc(p.ref) + "</td><td><b>" + esc(p.specs.clientName || "Sem nome") + "</b><br><span style=\"color:var(--muted);font-size:13px\">" + esc(p.specs.clientType || "") + (hasPartner(p) && p.specs.partner ? " · " + esc(p.specs.partner) : "") + "</span></td><td><span class=\"stone-line\">" + stoneImg(p.specs.stone, 34, 34) + "<span>" + esc(p.specs.pieceType || "—") + "<br><span style=\"color:var(--muted);font-size:13px\">" + esc(p.specs.stone || "") + "</span></span></span></td><td>" + STAGES[p.stage] + '</td><td><span class="chips">' + (p.stage < 5 ? projectFlags(p) : '<span class="chip ok">Concluído</span>') + '</span></td><td class="num">' + fmtDate(p.dueDate) + '</td><td class="num">' + euro(p.specs.quoteValue) + "</td></tr>";
     });
     h += "</tbody></table></div></section>";
     return h;
@@ -545,7 +666,8 @@ td.num { font-variant-numeric: tabular-nums; }
     return '<dl class="ficha">' + keys.filter(function (k) { return applies(FIELD[k] || {}, p); }).map(function (k) {
       var lab = { pieceType: "Peça", stone: "Pedra", area: "Área" }[k] || FIELD[k].label;
       var wide = k === "sinkModel" || k === "stone" || k === "pieceType";
-      return '<div' + (wide ? ' class="wide"' : "") + "><dt>" + esc(lab) + "</dt><dd>" + specVal(p, k) + "</dd></div>";
+      var val = k === "stone" && p.specs.stone ? '<span class="stone-line">' + stoneImg(p.specs.stone, 72, 44) + "<span>" + specVal(p, k) + "</span></span>" : specVal(p, k);
+      return '<div' + (wide ? ' class="wide"' : "") + "><dt>" + esc(lab) + "</dt><dd>" + val + "</dd></div>";
     }).join("") + "</dl>";
   }
   function issueBlock(p, from) {
@@ -585,12 +707,12 @@ td.num { font-variant-numeric: tabular-nums; }
     h += "</section>";
     h += '<section class="two"><div><div class="section-head"><h2>Prontas, à espera de montagem</h2><span class="chip">' + cut.length + '</span></div><div class="list compact">' + (cut.length ? cut.map(function (p) {
       var open = expanded[p.id];
-      return '<div class="row"><span><span class="t">' + esc(p.specs.clientName || "") + '</span><br><span class="d">' + esc(p.specs.pieceType || "") + " · " + esc(p.specs.stone || "") + " · " + esc(p.specs.slab || "") + '</span></span><span class="job-actions">' + deadlineChip(p.specs.installDate, "montagem") + toggleBtn(p) + "</span></div>" +
+      return '<div class="row"><span class="stone-line">' + stoneImg(p.specs.stone, 34, 34) + '<span><span class="t">' + esc(p.specs.clientName || "") + '</span><br><span class="d">' + esc(p.specs.pieceType || "") + " · " + esc(p.specs.stone || "") + " · " + esc(p.specs.slab || "") + '</span></span></span><span class="job-actions">' + deadlineChip(p.specs.installDate, "montagem") + toggleBtn(p) + "</span></div>" +
         (open ? '<div class="expand">' + ficha(p, TECH) + '<dl class="ficha"><div class="wide"><dt>Chapa / lote usado</dt><dd>' + specVal(p, "slab") + '</dd></div></dl><div class="job-actions"><button class="btn sm" data-act="cut-undo" data-id="' + esc(p.id) + '">Desfazer corte concluído</button></div>' + issueBlock(p, "Produção") + "</div>" : "");
     }).join("") : '<div class="empty">Nenhuma.</div>') + "</div></div>";
     h += '<div><div class="section-head"><h2>A chegar da medição</h2><span class="chip">' + coming.length + '</span></div><div class="list compact">' + (coming.length ? coming.map(function (p) {
       var b = blocking(p).length;
-      return '<div class="row"><span><span class="t">' + esc(p.specs.clientName || "") + '</span><br><span class="d">' + esc(p.specs.pieceType || "") + " · " + esc(p.specs.stone || "") + '</span></span><span class="job-actions">' + (b ? '<span class="chip warn">' + (b === 1 ? "Falta 1 detalhe" : "Faltam " + b + " detalhes") + "</span>" : '<span class="chip ok">Pronto para produção</span>') + toggleBtn(p) + "</span></div>" +
+      return '<div class="row"><span class="stone-line">' + stoneImg(p.specs.stone, 34, 34) + '<span><span class="t">' + esc(p.specs.clientName || "") + '</span><br><span class="d">' + esc(p.specs.pieceType || "") + " · " + esc(p.specs.stone || "") + '</span></span></span><span class="job-actions">' + (b ? '<span class="chip warn">' + (b === 1 ? "Falta 1 detalhe" : "Faltam " + b + " detalhes") + "</span>" : '<span class="chip ok">Pronto para produção</span>') + toggleBtn(p) + "</span></div>" +
         (expanded[p.id] ? '<div class="expand">' + ficha(p, TECH) + "</div>" : "");
     }).join("") : '<div class="empty">Nenhuma.</div>') + "</div></div></section>";
     return h;
@@ -656,7 +778,7 @@ td.num { font-variant-numeric: tabular-nums; }
     var first = (p.specs.clientName || "").split(" ")[0];
     h += '<section class="client-hero"><div class="hello">Olá' + (first ? " " + esc(first) : "") + ' · projeto <span class="mono">' + esc(p.ref) + "</span></div><h2>" + esc(STAGES[p.stage] === "Concluído" ? "Obra concluída" : STAGES[p.stage]) + "</h2><div>" + esc(CLIENT_NOW[p.stage]) + "</div>" +
       (CLIENT_NEXT[p.stage] ? '<div class="next">' + esc(CLIENT_NEXT[p.stage]) + "</div>" : "") +
-      '<div style="color:var(--muted);font-size:14px">' + esc(p.specs.pieceType || "") + (p.specs.stone ? " em " + esc(p.specs.stone) : "") + "</div></section>";
+      '<div class="stone-line" style="color:var(--muted);font-size:14px">' + stoneImg(p.specs.stone, 64, 40) + "<span>" + esc(p.specs.pieceType || "") + (p.specs.stone ? " em " + esc(p.specs.stone) : "") + "</span></div></section>";
     var owed = p.stage < 5 ? clientOwed(p) : [];
     if (owed.length) {
       h += '<section class="panel gate blocked"><h3>Precisamos de alguns detalhes seus</h3><div style="font-size:14px;color:var(--muted)">Sem eles não conseguimos avançar. Preencha o que souber e carregue em Enviar.</div><form id="cli-form" class="fields">' + owed.map(function (f) {
@@ -688,7 +810,8 @@ td.num { font-variant-numeric: tabular-nums; }
     if (f.type === "select") {
       input = '<select id="' + id + '" data-field="' + f.key + '"><option value="">Escolher…</option>' + f.options.map(function (o) { return "<option" + (v === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>";
     } else {
-      input = '<input type="' + f.type + '" id="' + id + '" data-field="' + f.key + '" value="' + esc(v) + '"' + (f.ph ? ' placeholder="' + esc(f.ph) + '"' : "") + (f.type === "number" ? ' step="any" min="0"' : "") + ">";
+      input = '<input type="' + f.type + '" id="' + id + '" data-field="' + f.key + '" value="' + esc(v) + '"' + (f.ph ? ' placeholder="' + esc(f.ph) + '"' : "") + (f.type === "number" ? ' step="any" min="0"' : "") + (f.key === "stone" ? ' list="stone-list" autocomplete="off"' : "") + ">";
+      if (f.key === "stone") input += stonePreview(v, "stone-prev-drawer");
     }
     return '<div class="field' + miss + (f.full ? " full" : "") + '"><label for="' + id + '">' + esc(f.label) + " " + who + "</label>" + input + "</div>";
   }
@@ -714,7 +837,7 @@ td.num { font-variant-numeric: tabular-nums; }
     var b = blocking(p), ahead = missingAhead(p), owed = clientOwed(p);
     var missingKeys = {}; b.forEach(function (f) { missingKeys[f.key] = true; });
     var h = '<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title">';
-    h += '<div class="d-head"><div class="grow"><div class="mono" style="color:var(--muted)">' + esc(p.ref) + '</div><h2 id="d-title">' + esc(p.specs.clientName || "Novo projeto") + '</h2><div class="sub">' + esc(p.specs.pieceType || "Tipo de peça por definir") + (p.specs.stone ? " · " + esc(p.specs.stone) : "") + (p.specs.quoteValue ? " · " + euro(p.specs.quoteValue) : "") + '</div></div><button class="btn ghost" data-close aria-label="Fechar">✕</button></div>';
+    h += '<div class="d-head">' + stoneImg(p.specs.stone, 52, 52) + '<div class="grow"><div class="mono" style="color:var(--muted)">' + esc(p.ref) + '</div><h2 id="d-title">' + esc(p.specs.clientName || "Novo projeto") + '</h2><div class="sub">' + esc(p.specs.pieceType || "Tipo de peça por definir") + (p.specs.stone ? " · " + esc(p.specs.stone) : "") + (p.specs.quoteValue ? " · " + euro(p.specs.quoteValue) : "") + '</div></div><button class="btn ghost" data-close aria-label="Fechar">✕</button></div>';
     h += '<div class="d-body">';
     h += '<div class="stepper">' + STAGES.map(function (s, i) { return '<div class="step ' + (i < p.stage ? "done" : i === p.stage ? "now" : "") + '"><i></i><span>' + s + "</span></div>"; }).join("") + "</div>";
 
@@ -961,7 +1084,7 @@ td.num { font-variant-numeric: tabular-nums; }
     if (f.type === "check") return '<div class="field check' + (f.full ? " full" : "") + '"><input type="checkbox" id="' + id + '" data-imp="' + f.key + '"' + (v ? " checked" : "") + '><label for="' + id + '">' + esc(f.label) + mark + "</label></div>";
     var input = f.type === "select"
       ? '<select id="' + id + '" data-imp="' + f.key + '"><option value="">Escolher…</option>' + f.options.map(function (o) { return "<option" + (v === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>"
-      : '<input type="' + f.type + '" id="' + id + '" data-imp="' + f.key + '" value="' + esc(v == null ? "" : v) + '"' + (f.type === "number" ? ' step="any" min="0"' : "") + ">";
+      : '<input type="' + f.type + '" id="' + id + '" data-imp="' + f.key + '" value="' + esc(v == null ? "" : v) + '"' + (f.type === "number" ? ' step="any" min="0"' : "") + (f.key === "stone" ? ' list="stone-list" autocomplete="off"' : "") + ">" + (f.key === "stone" ? stonePreview(v, "stone-prev-imp") : "");
     return '<div class="field' + (f.full ? " full" : "") + (found ? " found" : "") + '"><label for="' + id + '">' + esc(f.label) + mark + "</label>" + input + "</div>";
   }
 
@@ -1096,6 +1219,10 @@ td.num { font-variant-numeric: tabular-nums; }
     if (e.target.id === "imp-notes" && imp && imp.draft) { imp.draft.notes = e.target.value; return; }
     if (e.target.id === "f-q") { listFilter.q = e.target.value; deferMain = "force"; render(); return; }
     if (e.target.hasAttribute("data-draft")) drafts[e.target.id] = e.target.value;
+    if (e.target.dataset.field === "stone" || e.target.dataset.imp === "stone") {
+      var pv = e.target.parentNode.querySelector(".stone-preview"), src = stoneDataURL(e.target.value, 132, 84);
+      if (pv) { pv.hidden = !src; pv.querySelector("img").src = src; }
+    }
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") { if (imp) closeImport(); else if (openId) closeDrawer(); }
@@ -1111,6 +1238,7 @@ td.num { font-variant-numeric: tabular-nums; }
   document.addEventListener("drop", function (e) { var z = e.target.closest && e.target.closest("#imp-drop"); if (z && imp) { e.preventDefault(); addImportFiles(e.dataTransfer.files); } });
 
   // ---------- Boot ----------
+  $("#stone-list").innerHTML = STONE_CATALOG.map(function (c) { return '<option value="' + esc(c.name) + '">'; }).join("");
   render();
   var started = false;
   function startLocal() {
