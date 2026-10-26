@@ -1,0 +1,895 @@
+<title>Fluxo de Obras</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: top bar + tabbed workspace (Painel / Projetos); a side drawer holds one project's full record. */
+:root {
+  --bg: #f3f4f3;
+  --surface: #ffffff;
+  --surface-2: #eceeed;
+  --line: #d8dcda;
+  --fg: #1d2321;
+  --muted: #5d6763;
+  --accent: #1f5f5b;
+  --accent-fg: #ffffff;
+  --accent-soft: #dcebe9;
+  --bad: #b3261e;
+  --bad-soft: #f8e1df;
+  --warn: #8a5a00;
+  --warn-soft: #f8ecd2;
+  --ok: #2c6e3a;
+  --ok-soft: #e0f0e2;
+  --shadow: 0 8px 30px rgba(20, 30, 28, .16);
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2220; --surface-2: #232b28; --line: #33403b;
+    --fg: #e6ebe9; --muted: #9aa7a2; --accent: #6fbfb6; --accent-fg: #0c1614; --accent-soft: #1f3633;
+    --bad: #f2a29b; --bad-soft: #3b1f1d; --warn: #e8c071; --warn-soft: #3a2f17; --ok: #8fd29c; --ok-soft: #1d3322;
+    --shadow: 0 8px 30px rgba(0,0,0,.5); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2220; --surface-2: #232b28; --line: #33403b;
+  --fg: #e6ebe9; --muted: #9aa7a2; --accent: #6fbfb6; --accent-fg: #0c1614; --accent-soft: #1f3633;
+  --bad: #f2a29b; --bad-soft: #3b1f1d; --warn: #e8c071; --warn-soft: #3a2f17; --ok: #8fd29c; --ok-soft: #1d3322;
+  --shadow: 0 8px 30px rgba(0,0,0,.5); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--f-mono); font-size: .85em; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Top bar */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.brand .mark { width: 28px; height: 28px; border-radius: 6px; background: linear-gradient(135deg, var(--accent) 0 50%, var(--surface-2) 50%); border: 1px solid var(--line); }
+.brand h1 { font-size: 18px; letter-spacing: .01em; }
+.brand small { display: block; color: var(--muted); font-size: 12px; font-family: var(--f-body); font-weight: 400; }
+.tabs { display: flex; gap: 4px; background: var(--surface-2); padding: 3px; border-radius: 8px; }
+.tabs button { border: 0; background: transparent; padding: 6px 14px; border-radius: 6px; font-weight: 600; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 7px 14px; border-radius: 7px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.primary:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.danger { color: var(--bad); }
+.btn.sm { padding: 4px 10px; font-size: 13px; }
+
+main { padding-block: 20px 60px; display: grid; gap: 24px; }
+main > *, .two > * { min-width: 0; }
+.banner { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.section-head h2 { font-size: 16px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+
+/* KPI strip */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; text-align: left; display: grid; gap: 2px; }
+.kpi b { font-family: var(--f-display); font-size: 28px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.kpi span { color: var(--muted); font-size: 13px; }
+.kpi.bad b { color: var(--bad); } .kpi.warn b { color: var(--warn); }
+.kpi[data-filter] { cursor: pointer; }
+.kpi[data-filter]:hover { border-color: var(--muted); }
+@media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Attention list */
+.two { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.row { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 12px; padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; align-items: center; background: none; border-left: 0; border-right: 0; border-top: 0; width: 100%; text-align: left; }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--surface-2); }
+.row .sev { align-self: stretch; }
+.row .sev.bad { background: var(--bad); } .row .sev.warn { background: var(--warn); } .row .sev.info { background: var(--accent); }
+.row .t { font-weight: 600; }
+.row .d { color: var(--muted); font-size: 13px; }
+.row .when { font-size: 13px; color: var(--muted); text-align: right; white-space: nowrap; }
+.empty { padding: 22px 16px; color: var(--muted); text-align: center; }
+
+/* Chips */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.acc { background: var(--accent-soft); color: var(--accent); }
+
+/* Pipeline */
+.pipe-scroll { overflow-x: auto; padding-bottom: 6px; }
+.pipe { display: grid; grid-template-columns: repeat(6, minmax(190px, 1fr)); gap: 10px; }
+.col { background: var(--surface-2); border-radius: 10px; padding: 8px; display: grid; gap: 8px; align-content: start; min-height: 120px; }
+.col h3 { font-size: 14px; display: flex; justify-content: space-between; padding: 4px 4px 2px; }
+.col h3 span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.col p.hint { margin: 0 4px 4px; font-size: 12px; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; text-align: left; display: grid; gap: 5px; width: 100%; }
+.card:hover { border-color: var(--muted); }
+.card .ref { color: var(--muted); }
+.card .name { font-weight: 600; line-height: 1.25; }
+.card .piece { font-size: 13px; color: var(--muted); }
+
+/* Agenda */
+.agenda .row { grid-template-columns: 64px minmax(0, 1fr); padding-left: 14px; }
+.agenda .date { font-family: var(--f-display); font-weight: 600; font-variant-numeric: tabular-nums; }
+.agenda .date small { display: block; font-family: var(--f-body); color: var(--muted); font-weight: 400; font-size: 12px; text-transform: capitalize; }
+
+/* Projects table */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.filters input, .filters select { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 6px 10px; }
+.filters input { min-width: 0; flex: 1 1 220px; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; min-width: 820px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; background: var(--surface-2); }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; }
+
+/* Drawer */
+.scrim { position: fixed; inset: 0; background: rgba(10, 16, 14, .45); z-index: 20; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100%); background: var(--bg); z-index: 21; box-shadow: var(--shadow); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.d-head { background: var(--surface); border-bottom: 1px solid var(--line); padding: 14px 18px; display: flex; gap: 12px; align-items: flex-start; }
+.d-head .grow { flex: 1; min-width: 0; }
+.d-head h2 { font-size: 20px; }
+.d-head .sub { color: var(--muted); font-size: 14px; }
+.d-body { overflow-y: auto; padding: 16px 18px 40px; display: grid; gap: 16px; align-content: start; }
+.stepper { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.step { display: grid; gap: 4px; font-size: 12px; color: var(--muted); text-align: center; }
+.step i { height: 6px; border-radius: 3px; background: var(--line); }
+.step.done i { background: var(--accent); opacity: .5; }
+.step.now i { background: var(--accent); }
+.step.now { color: var(--fg); font-weight: 600; }
+@media (max-width: 520px) { .step span { display: none; } .step.now span { display: block; white-space: nowrap; } .stepper { grid-template-columns: repeat(6, minmax(0,1fr)); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; }
+.panel h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.panel.gate.blocked { border-color: var(--bad); }
+.panel.gate.ready { border-color: var(--ok); }
+.gate-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.msg { width: 100%; min-height: 130px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--surface-2); resize: vertical; font-size: 14px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+@media (max-width: 560px) { .fields { grid-template-columns: minmax(0, 1fr); } }
+.field { display: grid; gap: 3px; min-width: 0; }
+.field label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.field input[type=text], .field input[type=number], .field input[type=date], .field input[type=tel], .field input[type=email], .field select, .field textarea { border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--surface); width: 100%; min-width: 0; }
+.field.missing input, .field.missing select { border-color: var(--bad); background: var(--bad-soft); }
+.field.check { grid-template-columns: auto 1fr; align-items: center; gap: 8px; padding: 6px 0; }
+.field.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.field.check label { color: var(--fg); font-size: 14px; }
+.field.check.missing label { color: var(--bad); }
+.field.full { grid-column: 1 / -1; }
+.who { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 0 5px; border-radius: 4px; background: var(--surface-2); }
+.stage-sec { opacity: 1; }
+.stage-sec.future h3 { color: var(--muted); }
+.hist { display: grid; gap: 6px; font-size: 14px; }
+.hist div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; }
+.hist time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+.note-add { display: flex; gap: 8px; }
+.note-add input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--surface); }
+.confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--bad-soft); color: var(--bad); padding: 8px 10px; border-radius: 8px; }
+/* Role switch + worker views */
+.roles button { padding: 6px 12px; }
+.head-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.role-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.role-head h2 { font-size: 22px; }
+.role-head p { margin: 0; color: var(--muted); }
+.jobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 14px; }
+.job { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.job.urgent { border-color: var(--bad); }
+.job-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.job-head .name { font-family: var(--f-display); font-weight: 600; font-size: 17px; line-height: 1.2; }
+.job-head .ref { color: var(--muted); }
+.ficha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; }
+.ficha div { min-width: 0; }
+.ficha dt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.ficha dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.ficha .wide { grid-column: 1 / -1; }
+.job-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.issue { background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+.report { display: grid; gap: 6px; }
+.report textarea { border: 1px solid var(--line); border-radius: 7px; padding: 8px; min-height: 64px; background: var(--surface); resize: vertical; }
+.inline-field { display: grid; gap: 3px; }
+.inline-field label { font-size: 13px; color: var(--muted); }
+.inline-field input { border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--surface); width: 100%; }
+.inline-field.missing input { border-color: var(--bad); background: var(--bad-soft); }
+.checks { display: grid; gap: 4px; }
+.checks label { display: flex; gap: 8px; align-items: center; font-weight: 600; padding: 6px 0; }
+.checks input { width: 20px; height: 20px; accent-color: var(--accent); }
+.day-head { font-family: var(--f-display); font-size: 15px; font-weight: 600; margin: 4px 0 8px; display: flex; gap: 8px; align-items: center; }
+.contact { display: grid; gap: 4px; font-size: 14px; }
+.contact a { color: var(--accent); font-weight: 600; }
+.compact .row { grid-template-columns: minmax(0, 1fr) auto; padding-left: 14px; cursor: default; }
+.compact .row:hover { background: none; }
+.expand { padding: 0 14px 14px; display: grid; gap: 10px; border-bottom: 1px solid var(--line); }
+.list .expand:last-child { border-bottom: 0; }
+/* Customer page */
+.client-wrap { max-width: 680px; margin: 0 auto; width: 100%; display: grid; gap: 16px; }
+.preview-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--accent-soft); color: var(--fg); padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+.preview-bar select { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; background: var(--surface); min-width: 0; max-width: 100%; }
+.client-hero { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: grid; gap: 8px; }
+.client-hero .hello { color: var(--muted); }
+.client-hero h2 { font-size: 26px; }
+.client-hero .next { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; }
+.timeline li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; position: relative; padding-bottom: 16px; }
+.timeline li::before { content: ""; position: absolute; left: 13px; top: 24px; bottom: 0; width: 2px; background: var(--line); }
+.timeline li:last-child::before { display: none; }
+.timeline .dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--muted); z-index: 1; }
+.timeline li.done .dot { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.timeline li.now .dot { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.timeline b { display: block; }
+.timeline span { color: var(--muted); font-size: 14px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 8px; z-index: 40; font-weight: 600; max-width: calc(100% - 32px); }
+@media (prefers-reduced-motion: no-preference) { .drawer { animation: slide .18s ease-out; } @keyframes slide { from { transform: translateX(24px); opacity: .6; } } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><div class="mark" aria-hidden="true"></div><h1>Fluxo de Obras<small id="role-sub">Gestão de projetos em pedra</small></h1></div>
+    <nav class="tabs roles" aria-label="Vista">
+      <button id="role-gestao" data-role="gestao" aria-pressed="true">Gestão</button>
+      <button id="role-producao" data-role="producao" aria-pressed="false">Produção</button>
+      <button id="role-montagem" data-role="montagem" aria-pressed="false">Montagem</button>
+      <button id="role-cliente" data-role="cliente" aria-pressed="false">Cliente</button>
+    </nav>
+    <div class="head-tools" id="head-tools"></div>
+  </div>
+</header>
+<main class="wrap" id="view"></main>
+<div id="drawer-root"></div>
+<div id="toast-root"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Workflow definition ----------
+  var STAGES = ["Orçamento", "Confirmação", "Medição", "Produção", "Montagem", "Concluído"];
+  var STAGE_HINT = [
+    "Recolher o pedido e enviar o orçamento",
+    "Cliente aceita e marca-se a medição",
+    "Medir em obra e fechar os detalhes técnicos",
+    "Reservar a chapa, cortar e acabar",
+    "Entregar e montar em obra",
+    "Obra fechada"
+  ];
+  var CLIENT_TYPES = ["Cliente final", "Loja parceira", "Construtor"];
+  var PIECES = ["Bancada de cozinha", "Revestimento de cozinha", "Revestimento de casa de banho", "Base de duche", "Mesa de jantar", "Outro"];
+  var isKitchen = function (p) { return p.specs.pieceType === "Bancada de cozinha"; };
+  var hasPartner = function (p) { return p.specs.clientType && p.specs.clientType !== "Cliente final"; };
+
+  // stage = the stage that cannot be left until the field is filled; who = who has to provide it
+  var FIELDS = [
+    { key: "clientName", label: "Nome do cliente", type: "text", stage: 0, who: "equipa" },
+    { key: "clientType", label: "Origem do pedido", type: "select", options: CLIENT_TYPES, stage: 0, who: "equipa" },
+    { key: "partner", label: "Loja / construtor", type: "text", stage: 0, who: "equipa", when: hasPartner },
+    { key: "phone", label: "Telefone", type: "tel", stage: 0, who: "cliente" },
+    { key: "email", label: "Email", type: "email", stage: -1, who: "cliente" },
+    { key: "pieceType", label: "Tipo de peça", type: "select", options: PIECES, stage: 0, who: "cliente" },
+    { key: "stone", label: "Pedra / material", type: "text", stage: 0, who: "cliente", ph: "ex.: Granito Preto Zimbabwe" },
+    { key: "quoteValue", label: "Valor do orçamento (€)", type: "number", stage: 0, who: "equipa" },
+    { key: "quoteAccepted", label: "Orçamento aceite pelo cliente", type: "check", stage: 1, who: "cliente" },
+    { key: "address", label: "Morada da obra", type: "text", stage: 1, who: "cliente", full: true },
+    { key: "measureDate", label: "Data da medição", type: "date", stage: 1, who: "equipa" },
+    { key: "area", label: "Área medida (m²)", type: "number", stage: 2, who: "equipa" },
+    { key: "thickness", label: "Espessura", type: "select", options: ["2 cm", "3 cm", "Outra"], stage: 2, who: "cliente" },
+    { key: "finish", label: "Acabamento", type: "select", options: ["Polido", "Amaciado", "Escovado", "Flameado"], stage: 2, who: "cliente" },
+    { key: "edge", label: "Rebordo", type: "select", options: ["Reto", "Meia-cana", "Boleado", "Chanfrado", "Em esquadria"], stage: 2, who: "cliente" },
+    { key: "sinkModel", label: "Modelo do lava-loiça", type: "text", stage: 2, who: "cliente", when: isKitchen },
+    { key: "sinkMount", label: "Montagem do lava-loiça", type: "select", options: ["Por baixo (sub-montado)", "Por cima (encastrado)", "Integrado na pedra"], stage: 2, who: "cliente", when: isKitchen },
+    { key: "hobCutout", label: "Recorte da placa (medidas)", type: "text", stage: 2, who: "cliente", when: isKitchen, ph: "ex.: 560 × 490 mm" },
+    { key: "tapHoles", label: "Furos de torneira", type: "text", stage: 2, who: "cliente", when: isKitchen, ph: "ex.: 1 furo Ø35 mm" },
+    { key: "slab", label: "Chapa / lote reservado", type: "text", stage: 3, who: "equipa" },
+    { key: "cutDone", label: "Corte e acabamento concluídos", type: "check", stage: 3, who: "equipa" },
+    { key: "installDate", label: "Data da montagem", type: "date", stage: 3, who: "equipa" },
+    { key: "installDone", label: "Montagem concluída", type: "check", stage: 4, who: "equipa" },
+    { key: "clientSignoff", label: "Cliente confirmou a obra", type: "check", stage: 4, who: "cliente", noAsk: true }
+  ];
+  var FIELD = {}; FIELDS.forEach(function (f) { FIELD[f.key] = f; });
+
+  // ---------- Helpers ----------
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function blank(v) { return v === undefined || v === null || v === "" || v === false; }
+  function todayISO() { var d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+  function addDays(iso, n) { var d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+  function fmtDate(iso) { if (!iso) return "—"; var p = iso.slice(0, 10).split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
+  function fmtShort(iso) { var p = iso.slice(0, 10).split("-"); return p[2] + "/" + p[1]; }
+  function weekday(iso) { return new Date(iso + "T12:00:00").toLocaleDateString("pt-PT", { weekday: "short" }); }
+  function daysSince(ts) { return Math.max(0, Math.floor((Date.now() - Date.parse(ts)) / 86400000)); }
+  function euro(n) { return n === "" || n == null ? "—" : Number(n).toLocaleString("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function nowISO() { return new Date().toISOString(); }
+
+  function applies(f, p) { return !f.when || f.when(p); }
+  function missingAt(p, stage) { return FIELDS.filter(function (f) { return f.stage === stage && applies(f, p) && blank(p.specs[f.key]); }); }
+  function blocking(p) { return p.stage >= 5 ? [] : missingAt(p, p.stage); }
+  function missingAhead(p) { var out = []; for (var s = p.stage + 1; s < 5; s++) out = out.concat(missingAt(p, s)); return out; }
+  function clientOwed(p) { return blocking(p).concat(missingAhead(p)).filter(function (f) { return f.who === "cliente" && !f.noAsk; }); }
+  function isLate(p) { return p.stage < 5 && p.dueDate && p.dueDate < todayISO(); }
+  function waitDays(p) { return p.waitingSince ? daysSince(p.waitingSince) : null; }
+
+  // ---------- Store: shared db when available, this browser otherwise ----------
+  var projects = [];
+  var store = null;
+  var localMode = false;
+  var chains = {};
+  var LS_KEY = "fluxo-obras-local";
+
+  function localLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch (e) { return []; } }
+  function localSave() { try { localStorage.setItem(LS_KEY, JSON.stringify(projects)); } catch (e) {} }
+
+  function saveProject(p) {
+    p.updatedAt = nowISO();
+    var i = projects.findIndex(function (x) { return x.id === p.id; });
+    if (i < 0) projects.push(p); else projects[i] = p;
+    if (localMode || !store) { localSave(); scheduleRender(); return; }
+    var data = clone(p); delete data.id;
+    chains[p.id] = (chains[p.id] || Promise.resolve()).then(function () { return store.collection("projects").doc(p.id).set(data); })
+      .catch(function (e) { toast(e && e.code === "invalid_argument" ? "Sem permissão para alterar este projeto." : "Não foi possível guardar. Tente outra vez."); });
+    scheduleRender();
+  }
+  // Render after the browser has moved focus, so a click into the next field keeps its focus.
+  function scheduleRender() { clearTimeout(scheduleRender.t); scheduleRender.t = setTimeout(render, 0); }
+  function removeProject(p) {
+    projects = projects.filter(function (x) { return x.id !== p.id; });
+    if (localMode || !store) { localSave(); render(); return; }
+    store.collection("projects").doc(p.id).delete().catch(function () { toast("Não foi possível apagar o projeto."); });
+    render();
+  }
+  function newId() { return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function nextRef() {
+    var y = new Date().getFullYear(), max = 0;
+    projects.forEach(function (p) { var m = /^P-(\d{4})-(\d+)$/.exec(p.ref || ""); if (m && +m[1] === y) max = Math.max(max, +m[2]); });
+    return "P-" + y + "-" + String(max + 1).padStart(3, "0");
+  }
+  function log(p, text) { p.history = (p.history || []).concat([{ at: nowISO(), text: text }]); }
+
+  // ---------- UI state ----------
+  var view = "painel";
+  var openId = null;
+  var listFilter = { q: "", stage: "all", flag: "all" };
+  var confirmDelete = false;
+  var deferDrawer = false;
+  var ROLES = { gestao: "Gestão de projetos em pedra", producao: "Vista da produção", montagem: "Vista da equipa de montagem", cliente: "Página do cliente (pré-visualização)" };
+  var role = "gestao";
+  try { var h0 = (location.hash || "").slice(1); if (ROLES[h0]) role = h0; else { var r0 = localStorage.getItem("fluxo-obras-role"); if (ROLES[r0]) role = r0; } } catch (e) {}
+  var expanded = {};      // jobs opened to show their full sheet in the production lists
+  var reportOpen = null;   // project id whose problem form is open
+  var drafts = {};         // unsent text typed in worker / client forms, by input id
+  var clientPick = null;   // project shown in the customer preview
+  var deferMain = false;
+
+  function toast(msg) {
+    var r = $("#toast-root"); r.innerHTML = '<div class="toast" role="status">' + esc(msg) + "</div>";
+    clearTimeout(toast.t); toast.t = setTimeout(function () { r.innerHTML = ""; }, 2600);
+  }
+
+  // ---------- Views ----------
+  function projectFlags(p) {
+    var out = [];
+    if (p.issue) out.push('<span class="chip bad">Problema: ' + esc(p.issue.from) + "</span>");
+    var b = blocking(p);
+    if (b.length) out.push('<span class="chip bad">Falta ' + b.length + " para avançar</span>");
+    if (isLate(p)) out.push('<span class="chip bad">Atrasado</span>');
+    var w = waitDays(p);
+    if (w !== null) out.push('<span class="chip warn">À espera do cliente · ' + w + "d</span>");
+    if (!b.length && p.stage < 5 && !isLate(p)) out.push('<span class="chip ok">Pronto a avançar</span>');
+    return out.join("");
+  }
+
+  function attentionItems() {
+    var items = [];
+    projects.forEach(function (p) {
+      if (p.issue) items.push({ p: p, sev: "bad", rank: -1, t: "Problema reportado pela " + p.issue.from, d: p.issue.text });
+      if (p.stage >= 5) return;
+      var b = blocking(p), w = waitDays(p);
+      if (isLate(p)) items.push({ p: p, sev: "bad", rank: 0, t: "Atrasado: prazo era " + fmtDate(p.dueDate), d: STAGES[p.stage] + (b.length ? " · falta " + b.map(function (f) { return f.label.toLowerCase(); }).join(", ") : "") });
+      else if (w !== null && w >= 2) items.push({ p: p, sev: "warn", rank: 1, t: "Cliente sem resposta há " + w + " dias", d: "Pedido: " + clientOwed(p).map(function (f) { return f.label.toLowerCase(); }).join(", ") });
+      else if (w !== null) items.push({ p: p, sev: "info", rank: 3, t: "À espera do cliente" + (w === 0 ? " (pedido hoje)" : " há 1 dia"), d: "Pedido: " + clientOwed(p).map(function (f) { return f.label.toLowerCase(); }).join(", ") });
+      else if (b.length) items.push({ p: p, sev: "bad", rank: 2, t: "Parado em " + STAGES[p.stage] + ": falta " + b.length + (b.length === 1 ? " detalhe" : " detalhes"), d: b.map(function (f) { return f.label; }).join(" · ") });
+      else if (!b.length && missingAhead(p).some(function (f) { return f.who === "cliente"; }) && w === null) items.push({ p: p, sev: "info", rank: 3, t: "Pedir já ao cliente o que vai faltar", d: missingAhead(p).filter(function (f) { return f.who === "cliente"; }).map(function (f) { return f.label; }).join(" · ") });
+    });
+    return items.sort(function (a, b) { return a.rank - b.rank; });
+  }
+
+  function renderPainel() {
+    var active = projects.filter(function (p) { return p.stage < 5; });
+    var blocked = active.filter(function (p) { return blocking(p).length; }).length;
+    var waiting = active.filter(function (p) { return p.waitingSince; }).length;
+    var late = active.filter(isLate).length;
+    var att = attentionItems();
+    var today = todayISO(), limit = addDays(today, 7);
+    var agenda = [];
+    active.forEach(function (p) {
+      if (p.specs.measureDate && p.specs.measureDate >= today && p.specs.measureDate <= limit && p.stage <= 2) agenda.push({ date: p.specs.measureDate, what: "Medição", p: p });
+      if (p.specs.installDate && p.specs.installDate >= today && p.specs.installDate <= limit && p.stage <= 4) agenda.push({ date: p.specs.installDate, what: "Montagem", p: p });
+    });
+    agenda.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+
+    var h = "";
+    if (!projects.length) {
+      h += '<div class="list"><div class="empty"><p><b>Ainda não há projetos.</b></p><p>Crie o primeiro com <b>+ Novo projeto</b>. Cada projeto segue as etapas Orçamento → Confirmação → Medição → Produção → Montagem → Concluído, e o sistema mostra o que falta antes de cada passo.</p></div></div>';
+      return h;
+    }
+    h += '<section class="kpis">' +
+      '<button class="kpi" data-filter="active"><b>' + active.length + '</b><span>Projetos em curso</span></button>' +
+      '<button class="kpi bad" data-filter="blocked"><b>' + blocked + '</b><span>Parados por falta de informação</span></button>' +
+      '<button class="kpi warn" data-filter="waiting"><b>' + waiting + '</b><span>À espera de resposta do cliente</span></button>' +
+      '<button class="kpi bad" data-filter="late"><b>' + late + '</b><span>Fora do prazo</span></button>' +
+      "</section>";
+
+    h += '<section class="two"><div><div class="section-head"><h2>Precisa de atenção</h2><span class="chip">' + att.length + "</span></div>";
+    h += '<div class="list">' + (att.length ? att.map(function (a) {
+      return '<button class="row" data-open="' + esc(a.p.id) + '"><span class="sev ' + a.sev + '"></span><span style="min-width:0"><span class="t">' + esc(a.t) + '</span><br><span class="d">' + esc(a.p.specs.clientName || "Sem nome") + " · " + esc(a.p.specs.pieceType || "—") + " · " + esc(a.d) + '</span></span><span class="when mono">' + esc(a.p.ref) + "</span></button>";
+    }).join("") : '<div class="empty">Nada pendente. Todos os projetos têm a informação de que precisam.</div>') + "</div></div>";
+
+    h += '<div class="agenda"><div class="section-head"><h2>Próximos 7 dias</h2></div><div class="list">' + (agenda.length ? agenda.map(function (a) {
+      return '<button class="row" data-open="' + esc(a.p.id) + '"><span class="date">' + fmtShort(a.date) + "<small>" + esc(weekday(a.date)) + '</small></span><span style="min-width:0"><span class="t">' + a.what + '</span><br><span class="d">' + esc(a.p.specs.clientName || "") + (a.p.specs.address ? " · " + esc(a.p.specs.address) : "") + "</span></span></button>";
+    }).join("") : '<div class="empty">Sem medições nem montagens marcadas.</div>') + "</div></div></section>";
+
+    h += '<section><div class="section-head"><h2>Etapas</h2><span class="d" style="color:var(--muted);font-size:13px">Clique num projeto para abrir</span></div><div class="pipe-scroll"><div class="pipe">';
+    STAGES.forEach(function (s, i) {
+      var inStage = projects.filter(function (p) { return p.stage === i; }).sort(function (a, b) { return blocking(b).length - blocking(a).length; });
+      var shown = i === 5 ? inStage.slice(-4) : inStage;
+      h += '<div class="col"><h3>' + s + "<span>" + inStage.length + '</span></h3><p class="hint">' + STAGE_HINT[i] + "</p>";
+      shown.forEach(function (p) {
+        h += '<button class="card" data-open="' + esc(p.id) + '"><span class="ref mono">' + esc(p.ref) + (p.dueDate && i < 5 ? " · prazo " + fmtShort(p.dueDate) : "") + '</span><span class="name">' + esc(p.specs.clientName || "Sem nome") + '</span><span class="piece">' + esc(p.specs.pieceType || "—") + (p.specs.partner && hasPartner(p) ? " · " + esc(p.specs.partner) : "") + '</span><span class="chips">' + (i < 5 ? projectFlags(p) : '<span class="chip ok">Concluído</span>') + "</span></button>";
+      });
+      if (i === 5 && inStage.length > shown.length) h += '<p class="hint">+ ' + (inStage.length - shown.length) + " anteriores em Projetos</p>";
+      h += "</div>";
+    });
+    h += "</div></div></section>";
+    return h;
+  }
+
+  function filteredProjects() {
+    var q = listFilter.q.trim().toLowerCase();
+    return projects.filter(function (p) {
+      if (listFilter.stage !== "all" && String(p.stage) !== listFilter.stage) return false;
+      if (listFilter.flag === "active" && p.stage >= 5) return false;
+      if (listFilter.flag === "blocked" && !(p.stage < 5 && blocking(p).length)) return false;
+      if (listFilter.flag === "waiting" && !(p.stage < 5 && p.waitingSince)) return false;
+      if (listFilter.flag === "late" && !isLate(p)) return false;
+      if (!q) return true;
+      var s = [p.ref, p.specs.clientName, p.specs.partner, p.specs.pieceType, p.specs.stone, p.specs.address].join(" ").toLowerCase();
+      return s.indexOf(q) >= 0;
+    }).sort(function (a, b) { return (b.createdAt || "").localeCompare(a.createdAt || ""); });
+  }
+
+  function renderProjetos() {
+    var rows = filteredProjects();
+    var h = '<section><div class="section-head"><h2>Todos os projetos</h2><span class="chip">' + rows.length + " de " + projects.length + "</span></div>";
+    h += '<div class="filters" style="margin-bottom:10px"><input id="f-q" type="search" placeholder="Procurar por cliente, referência, pedra, morada…" value="' + esc(listFilter.q) + '">' +
+      '<select id="f-stage"><option value="all">Todas as etapas</option>' + STAGES.map(function (s, i) { return '<option value="' + i + '"' + (listFilter.stage === String(i) ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select>" +
+      '<select id="f-flag">' + [["all", "Todos"], ["active", "Em curso"], ["blocked", "Parados por falta de informação"], ["waiting", "À espera do cliente"], ["late", "Fora do prazo"]].map(function (o) { return '<option value="' + o[0] + '"' + (listFilter.flag === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></div>";
+    h += '<div class="table-wrap"><table><thead><tr><th>Ref.</th><th>Cliente</th><th>Peça / pedra</th><th>Etapa</th><th>Estado</th><th>Prazo</th><th>Orçamento</th></tr></thead><tbody>';
+    if (!rows.length) h += '<tr><td colspan="7" class="empty">Nenhum projeto corresponde a estes filtros.</td></tr>';
+    rows.forEach(function (p) {
+      h += '<tr data-open="' + esc(p.id) + '"><td class="mono">' + esc(p.ref) + "</td><td><b>" + esc(p.specs.clientName || "Sem nome") + "</b><br><span style=\"color:var(--muted);font-size:13px\">" + esc(p.specs.clientType || "") + (hasPartner(p) && p.specs.partner ? " · " + esc(p.specs.partner) : "") + "</span></td><td>" + esc(p.specs.pieceType || "—") + "<br><span style=\"color:var(--muted);font-size:13px\">" + esc(p.specs.stone || "") + "</span></td><td>" + STAGES[p.stage] + '</td><td><span class="chips">' + (p.stage < 5 ? projectFlags(p) : '<span class="chip ok">Concluído</span>') + '</span></td><td class="num">' + fmtDate(p.dueDate) + '</td><td class="num">' + euro(p.specs.quoteValue) + "</td></tr>";
+    });
+    h += "</tbody></table></div></section>";
+    return h;
+  }
+
+  function render() {
+    var v = $("#view");
+    var focusId = document.activeElement && v.contains(document.activeElement) ? document.activeElement.id : null;
+    var caret = focusId && document.activeElement.selectionStart;
+    if (focusId && document.activeElement.matches("input[type=text], textarea") && deferMain !== "force") { deferMain = true; return; }
+    deferMain = false;
+    var banner = !localMode ? "" : window.FLUXO_DEMO ? '<div class="banner">Demonstração com projetos de exemplo. As alterações ficam guardadas só neste navegador. <button class="btn sm" id="btn-demo-reset">Repor exemplos</button></div>' : '<div class="banner">Modo local: os dados ficam guardados só neste navegador. Abra a página no claude.ai para partilhar os projetos com a equipa.</div>';
+    renderHead();
+    var body = role === "producao" ? renderProducao() : role === "montagem" ? renderMontagem() : role === "cliente" ? renderCliente() : view === "painel" ? renderPainel() : renderProjetos();
+    v.innerHTML = banner + body;
+    restoreDrafts();
+    if (focusId && document.getElementById(focusId)) { var el = document.getElementById(focusId); el.focus(); try { if (caret != null) el.setSelectionRange(caret, caret); } catch (e) {} }
+    if (role === "gestao") renderDrawer(); else $("#drawer-root").innerHTML = "";
+  }
+
+  function renderHead() {
+    document.querySelectorAll("[data-role]").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.role === role ? "true" : "false"); });
+    $("#role-sub").textContent = ROLES[role];
+    var t = $("#head-tools");
+    var want = role === "gestao" ? "g-" + view : "";
+    if (t.dataset.state === want) return;
+    t.dataset.state = want;
+    t.innerHTML = role !== "gestao" ? "" :
+      '<nav class="tabs" role="tablist"><button role="tab" id="tab-painel" aria-selected="' + (view === "painel") + '" data-view="painel">Painel</button><button role="tab" id="tab-projetos" aria-selected="' + (view === "projetos") + '" data-view="projetos">Projetos</button></nav><button class="btn primary" id="btn-new">+ Novo projeto</button>';
+  }
+  function setRole(r) {
+    role = r; reportOpen = null;
+    try { localStorage.setItem("fluxo-obras-role", r); } catch (e) {}
+    if (r !== "gestao") openId = null;
+    deferMain = "force"; render(); window.scrollTo(0, 0);
+  }
+  function restoreDrafts() {
+    Object.keys(drafts).forEach(function (id) { var el = document.getElementById(id); if (el && el.value !== drafts[id]) el.value = drafts[id]; });
+  }
+
+  // ---------- Shared worker pieces ----------
+  function specVal(p, key) {
+    var v = p.specs[key];
+    return blank(v) ? '<span class="chip bad">Em falta</span>' : esc(key === "area" ? String(v).replace(".", ",") + " m²" : v);
+  }
+  function ficha(p, keys) {
+    return '<dl class="ficha">' + keys.filter(function (k) { return applies(FIELD[k] || {}, p); }).map(function (k) {
+      var lab = { pieceType: "Peça", stone: "Pedra", area: "Área" }[k] || FIELD[k].label;
+      var wide = k === "sinkModel" || k === "stone" || k === "pieceType";
+      return '<div' + (wide ? ' class="wide"' : "") + "><dt>" + esc(lab) + "</dt><dd>" + specVal(p, k) + "</dd></div>";
+    }).join("") + "</dl>";
+  }
+  function issueBlock(p, from) {
+    var h = "";
+    if (p.issue) h += '<div class="issue"><b>Problema reportado (' + esc(p.issue.from) + "):</b> " + esc(p.issue.text) + "</div>";
+    if (reportOpen === p.id) {
+      h += '<div class="report"><label for="rep-' + esc(p.id) + '" style="font-size:13px;color:var(--muted)">O que se passa? A gestora vê isto no painel.</label><textarea id="rep-' + esc(p.id) + '" data-draft placeholder="ex.: a chapa tem uma fissura no canto; falta o lava-loiça em obra"></textarea><div class="job-actions"><button class="btn primary sm" data-act="report-send" data-id="' + esc(p.id) + '" data-from="' + esc(from) + '">Enviar à gestora</button><button class="btn ghost sm" data-act="report-cancel">Cancelar</button></div></div>';
+    } else if (!p.issue) {
+      h += '<div class="job-actions"><button class="btn ghost sm" data-act="report" data-id="' + esc(p.id) + '">Reportar problema</button></div>';
+    }
+    return h;
+  }
+  function deadlineChip(iso, label) {
+    if (!iso) return '<span class="chip warn">Sem data de ' + label + "</span>";
+    var t = todayISO(), cls = iso < t ? "bad" : iso <= addDays(t, 3) ? "warn" : "acc";
+    return '<span class="chip ' + cls + '">' + (label === "montagem" ? "Montagem " : "") + fmtShort(iso) + (iso < t ? " · atrasado" : "") + "</span>";
+  }
+  function toggleBtn(p) { return '<button class="btn sm" data-act="toggle" data-id="' + esc(p.id) + '" aria-expanded="' + !!expanded[p.id] + '">' + (expanded[p.id] ? "Fechar ficha" : "Ver ficha") + "</button>"; }
+  var TECH = ["pieceType", "stone", "thickness", "finish", "edge", "area", "sinkModel", "sinkMount", "hobCutout", "tapHoles"];
+
+  // ---------- Produção ----------
+  function renderProducao() {
+    var byInstall = function (a, b) { return (a.specs.installDate || "9999").localeCompare(b.specs.installDate || "9999"); };
+    var toCut = projects.filter(function (p) { return p.stage === 3 && !p.specs.cutDone; }).sort(byInstall);
+    var cut = projects.filter(function (p) { return p.stage === 3 && p.specs.cutDone; }).sort(byInstall);
+    var coming = projects.filter(function (p) { return p.stage === 2; });
+    var h = '<div class="role-head"><h2>Produção</h2><p>' + toCut.length + (toCut.length === 1 ? " peça para cortar" : " peças para cortar") + ", ordenadas pela data de montagem.</p></div>";
+    h += '<section><div class="section-head"><h2>Para cortar</h2></div>';
+    h += toCut.length ? '<div class="jobs">' + toCut.map(function (p) {
+      var urgent = p.specs.installDate && p.specs.installDate <= addDays(todayISO(), 3);
+      return '<article class="job' + (urgent ? " urgent" : "") + '"><div class="job-head"><div><div class="ref mono">' + esc(p.ref) + '</div><div class="name">' + esc(p.specs.clientName || "Sem nome") + "</div></div>" + deadlineChip(p.specs.installDate, "montagem") + "</div>" +
+        ficha(p, TECH) +
+        '<div class="inline-field' + (blank(p.specs.slab) ? " missing" : "") + '"><label for="pf-slab-' + esc(p.id) + '">Chapa / lote usado</label><input type="text" id="pf-slab-' + esc(p.id) + '" data-pfield="slab" data-id="' + esc(p.id) + '" value="' + esc(p.specs.slab || "") + '" placeholder="ex.: Chapa 2213-B"></div>' +
+        '<div class="job-actions"><button class="btn primary" data-act="cut-done" data-id="' + esc(p.id) + '"' + (blank(p.specs.slab) ? " disabled title=\"Indique primeiro a chapa usada\"" : "") + '>Corte e acabamento concluídos</button></div>' +
+        issueBlock(p, "Produção") + "</article>";
+    }).join("") + "</div>" : '<div class="list"><div class="empty">Nada para cortar neste momento.</div></div>';
+    h += "</section>";
+    h += '<section class="two"><div><div class="section-head"><h2>Prontas, à espera de montagem</h2><span class="chip">' + cut.length + '</span></div><div class="list compact">' + (cut.length ? cut.map(function (p) {
+      var open = expanded[p.id];
+      return '<div class="row"><span><span class="t">' + esc(p.specs.clientName || "") + '</span><br><span class="d">' + esc(p.specs.pieceType || "") + " · " + esc(p.specs.stone || "") + " · " + esc(p.specs.slab || "") + '</span></span><span class="job-actions">' + deadlineChip(p.specs.installDate, "montagem") + toggleBtn(p) + "</span></div>" +
+        (open ? '<div class="expand">' + ficha(p, TECH) + '<dl class="ficha"><div class="wide"><dt>Chapa / lote usado</dt><dd>' + specVal(p, "slab") + '</dd></div></dl><div class="job-actions"><button class="btn sm" data-act="cut-undo" data-id="' + esc(p.id) + '">Desfazer corte concluído</button></div>' + issueBlock(p, "Produção") + "</div>" : "");
+    }).join("") : '<div class="empty">Nenhuma.</div>') + "</div></div>";
+    h += '<div><div class="section-head"><h2>A chegar da medição</h2><span class="chip">' + coming.length + '</span></div><div class="list compact">' + (coming.length ? coming.map(function (p) {
+      var b = blocking(p).length;
+      return '<div class="row"><span><span class="t">' + esc(p.specs.clientName || "") + '</span><br><span class="d">' + esc(p.specs.pieceType || "") + " · " + esc(p.specs.stone || "") + '</span></span><span class="job-actions">' + (b ? '<span class="chip warn">' + (b === 1 ? "Falta 1 detalhe" : "Faltam " + b + " detalhes") + "</span>" : '<span class="chip ok">Pronto para produção</span>') + toggleBtn(p) + "</span></div>" +
+        (expanded[p.id] ? '<div class="expand">' + ficha(p, TECH) + "</div>" : "");
+    }).join("") : '<div class="empty">Nenhuma.</div>') + "</div></div></section>";
+    return h;
+  }
+
+  // ---------- Montagem ----------
+  function dayLabel(iso) {
+    var t = todayISO();
+    if (iso === t) return "Hoje · " + fmtShort(iso);
+    if (iso === addDays(t, 1)) return "Amanhã · " + fmtShort(iso);
+    return weekday(iso).replace(".", "") + " · " + fmtShort(iso) + (iso < t ? " · atrasada" : "");
+  }
+  function renderMontagem() {
+    var jobs = projects.filter(function (p) { return p.stage === 4 || (p.stage === 3 && p.specs.installDate); })
+      .sort(function (a, b) { return (a.specs.installDate || "9999").localeCompare(b.specs.installDate || "9999"); });
+    var h = '<div class="role-head"><h2>Montagem</h2><p>' + jobs.length + (jobs.length === 1 ? " montagem marcada ou por marcar." : " montagens marcadas ou por marcar.") + "</p></div>";
+    if (!jobs.length) return h + '<div class="list"><div class="empty">Sem montagens neste momento.</div></div>';
+    var groups = {}, order = [];
+    jobs.forEach(function (p) { var k = p.specs.installDate || "none"; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(p); });
+    order.forEach(function (k) {
+      h += '<section><div class="day-head">' + (k === "none" ? "Sem data marcada" : esc(dayLabel(k))) + ' <span class="chip">' + groups[k].length + '</span></div><div class="jobs">';
+      groups[k].forEach(function (p) {
+        var ready = p.stage === 4 ? '<span class="chip ok">Peça pronta</span>' : p.specs.cutDone ? '<span class="chip ok">Peça pronta na fábrica</span>' : '<span class="chip warn">Ainda em produção</span>';
+        var addr = p.specs.address || "";
+        h += '<article class="job"><div class="job-head"><div><div class="ref mono">' + esc(p.ref) + '</div><div class="name">' + esc(p.specs.clientName || "Sem nome") + "</div></div>" + ready + "</div>";
+        h += '<div class="contact">' + (addr ? "<span>" + esc(addr) + ' · <a href="https://www.google.com/maps/search/?api=1&amp;query=' + encodeURIComponent(addr) + '" target="_blank" rel="noopener">Abrir no mapa</a></span>' : '<span class="chip bad">Morada em falta</span>') + (p.specs.phone ? '<span>Telefone: <span class="mono">' + esc(p.specs.phone) + "</span></span>" : "") + "</div>";
+        h += ficha(p, ["pieceType", "stone", "area", "edge", "finish", "sinkModel", "sinkMount", "hobCutout", "tapHoles"]);
+        if (p.stage === 4) {
+          h += '<div class="checks"><label><input type="checkbox" id="mc-done-' + esc(p.id) + '" data-mcheck="installDone" data-id="' + esc(p.id) + '"' + (p.specs.installDone ? " checked" : "") + "> Montagem concluída</label>" +
+            '<label><input type="checkbox" id="mc-sign-' + esc(p.id) + '" data-mcheck="clientSignoff" data-id="' + esc(p.id) + '"' + (p.specs.clientSignoff ? " checked" : "") + "> Cliente confirmou que está tudo bem</label></div>";
+          if (p.specs.installDone && p.specs.clientSignoff) h += '<span class="chip ok">Concluída. A gestora fecha a obra.</span>';
+        }
+        h += issueBlock(p, "Montagem") + "</article>";
+      });
+      h += "</div></section>";
+    });
+    return h;
+  }
+
+  // ---------- Cliente ----------
+  var CLIENT_NOW = [
+    "Estamos a preparar o seu orçamento.",
+    "O orçamento está pronto. Falta a sua confirmação e marcar a medição.",
+    "Estamos a medir o espaço e a fechar os detalhes técnicos.",
+    "A sua pedra está a ser cortada e acabada na nossa fábrica.",
+    "A sua peça está pronta e a montagem está marcada.",
+    "A obra está concluída. Obrigado pela confiança!"
+  ];
+  var CLIENT_NEXT = [
+    "A seguir: enviamos-lhe o orçamento.",
+    "A seguir: depois da sua confirmação, marcamos a visita de medição.",
+    "A seguir: com todos os detalhes fechados, a peça entra em produção.",
+    "A seguir: quando a peça estiver pronta, fazemos a montagem.",
+    "A seguir: no fim da montagem, confirme connosco que está tudo bem.",
+    ""
+  ];
+  function renderCliente() {
+    if (!projects.length) return '<div class="list"><div class="empty">Ainda não há projetos para mostrar.</div></div>';
+    var list = projects.slice().sort(function (a, b) { return (a.ref || "").localeCompare(b.ref || ""); });
+    var p = list.find(function (x) { return x.id === clientPick; }) || list.find(function (x) { return x.stage === 2; }) || list[0];
+    clientPick = p.id;
+    var h = '<div class="client-wrap"><div class="preview-bar"><label for="cli-pick"><b>Pré-visualizar como:</b></label><select id="cli-pick">' + list.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === p.id ? " selected" : "") + ">" + esc(x.ref + " · " + (x.specs.clientName || "")) + "</option>"; }).join("") + '</select><span style="color:var(--muted)">Cada cliente verá só o seu projeto.</span></div>';
+    var first = (p.specs.clientName || "").split(" ")[0];
+    h += '<section class="client-hero"><div class="hello">Olá' + (first ? " " + esc(first) : "") + ' · projeto <span class="mono">' + esc(p.ref) + "</span></div><h2>" + esc(STAGES[p.stage] === "Concluído" ? "Obra concluída" : STAGES[p.stage]) + "</h2><div>" + esc(CLIENT_NOW[p.stage]) + "</div>" +
+      (CLIENT_NEXT[p.stage] ? '<div class="next">' + esc(CLIENT_NEXT[p.stage]) + "</div>" : "") +
+      '<div style="color:var(--muted);font-size:14px">' + esc(p.specs.pieceType || "") + (p.specs.stone ? " em " + esc(p.specs.stone) : "") + "</div></section>";
+    var owed = p.stage < 5 ? clientOwed(p) : [];
+    if (owed.length) {
+      h += '<section class="panel gate blocked"><h3>Precisamos de alguns detalhes seus</h3><div style="font-size:14px;color:var(--muted)">Sem eles não conseguimos avançar. Preencha o que souber e carregue em Enviar.</div><form id="cli-form" class="fields">' + owed.map(function (f) {
+        var id = "cf-" + f.key;
+        if (f.type === "check") return '<div class="field check full"><input type="checkbox" id="' + id + '" data-cfield="' + f.key + '"><label for="' + id + '">' + esc(f.key === "quoteAccepted" ? "Aceito o orçamento" + (p.specs.quoteValue ? " de " + euro(p.specs.quoteValue) : "") : f.label) + "</label></div>";
+        var input = f.type === "select" ? '<select id="' + id + '" data-cfield="' + f.key + '"><option value="">Escolher…</option>' + f.options.map(function (o) { return "<option>" + esc(o) + "</option>"; }).join("") + "</select>"
+          : '<input type="' + (f.type === "tel" ? "tel" : f.type === "date" ? "date" : "text") + '" id="' + id + '" data-cfield="' + f.key + '" data-draft' + (f.ph ? ' placeholder="' + esc(f.ph) + '"' : "") + ">";
+        return '<div class="field' + (f.full ? " full" : "") + '"><label for="' + id + '">' + esc(f.label) + "</label>" + input + "</div>";
+      }).join("") + '<div class="full"><button class="btn primary" type="submit">Enviar</button></div></form></section>';
+    }
+    var dates = { 2: p.specs.measureDate ? "Medição a " + fmtDate(p.specs.measureDate) : "", 4: p.specs.installDate ? "Montagem a " + fmtDate(p.specs.installDate) : "" };
+    h += '<section class="panel"><h3>O seu projeto, passo a passo</h3><ol class="timeline">' + STAGES.map(function (s, i) {
+      var cls = i < p.stage || p.stage === 5 ? "done" : i === p.stage ? "now" : "";
+      return '<li class="' + cls + '"><span class="dot">' + (cls === "done" ? "✓" : i + 1) + "</span><div><b>" + s + "</b><span>" + esc(dates[i] || STAGE_HINT[i]) + "</span></div></li>";
+    }).join("") + "</ol></section></div>";
+    return h;
+  }
+
+  // ---------- Drawer (one project) ----------
+  function fieldHTML(p, f, missingKeys) {
+    var v = p.specs[f.key];
+    var miss = missingKeys[f.key] ? " missing" : "";
+    var who = '<span class="who">' + (f.who === "cliente" ? "cliente" : "equipa") + "</span>";
+    var id = "fld-" + f.key;
+    if (f.type === "check") {
+      return '<div class="field check' + miss + (f.full ? " full" : "") + '"><input type="checkbox" id="' + id + '" data-field="' + f.key + '"' + (v ? " checked" : "") + '><label for="' + id + '">' + esc(f.label) + " " + who + "</label></div>";
+    }
+    var input;
+    if (f.type === "select") {
+      input = '<select id="' + id + '" data-field="' + f.key + '"><option value="">Escolher…</option>' + f.options.map(function (o) { return "<option" + (v === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>";
+    } else {
+      input = '<input type="' + f.type + '" id="' + id + '" data-field="' + f.key + '" value="' + esc(v) + '"' + (f.ph ? ' placeholder="' + esc(f.ph) + '"' : "") + (f.type === "number" ? ' step="any" min="0"' : "") + ">";
+    }
+    return '<div class="field' + miss + (f.full ? " full" : "") + '"><label for="' + id + '">' + esc(f.label) + " " + who + "</label>" + input + "</div>";
+  }
+
+  function requestMessage(p) {
+    var owed = clientOwed(p);
+    if (!owed.length) return "";
+    var name = (p.specs.clientName || "").split(" ")[0];
+    return "Olá" + (name ? " " + name : "") + ",\n\nPara avançarmos com o seu projeto " + p.ref + (p.specs.pieceType ? " (" + p.specs.pieceType.toLowerCase() + ")" : "") + ", precisamos das seguintes informações:\n\n" +
+      owed.map(function (f) { return "• " + f.label; }).join("\n") +
+      "\n\nPode responder a esta mensagem com os detalhes ou com uma fotografia. Obrigado!";
+  }
+
+  function renderDrawer() {
+    var root = $("#drawer-root");
+    var p = openId && projects.find(function (x) { return x.id === openId; });
+    if (!p) { root.innerHTML = ""; return; }
+    if (root.contains(document.activeElement) && document.activeElement.matches("input[type=text],input[type=number],input[type=tel],input[type=email],textarea,#note-input") && deferDrawer !== "force") { deferDrawer = true; return; }
+    var body = root.querySelector(".d-body");
+    var scroll = body ? body.scrollTop : 0;
+    var focusId = document.activeElement && root.contains(document.activeElement) ? document.activeElement.id : null;
+
+    var b = blocking(p), ahead = missingAhead(p), owed = clientOwed(p);
+    var missingKeys = {}; b.forEach(function (f) { missingKeys[f.key] = true; });
+    var h = '<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title">';
+    h += '<div class="d-head"><div class="grow"><div class="mono" style="color:var(--muted)">' + esc(p.ref) + '</div><h2 id="d-title">' + esc(p.specs.clientName || "Novo projeto") + '</h2><div class="sub">' + esc(p.specs.pieceType || "Tipo de peça por definir") + (p.specs.stone ? " · " + esc(p.specs.stone) : "") + (p.specs.quoteValue ? " · " + euro(p.specs.quoteValue) : "") + '</div></div><button class="btn ghost" data-close aria-label="Fechar">✕</button></div>';
+    h += '<div class="d-body">';
+    h += '<div class="stepper">' + STAGES.map(function (s, i) { return '<div class="step ' + (i < p.stage ? "done" : i === p.stage ? "now" : "") + '"><i></i><span>' + s + "</span></div>"; }).join("") + "</div>";
+
+    // Gate
+    if (p.stage < 5) {
+      var next = STAGES[p.stage + 1];
+      h += '<div class="panel gate ' + (b.length ? "blocked" : "ready") + '"><h3>' + (b.length ? "Para passar a " + next + " falta:" : "Tudo pronto para passar a " + next) + "</h3>";
+      if (b.length) h += '<div class="chips">' + b.map(function (f) { return '<span class="chip bad">' + esc(f.label) + " · " + f.who + "</span>"; }).join("") + "</div>";
+      if (ahead.length) h += '<div style="font-size:13px;color:var(--muted)">Ainda vai faltar mais à frente: ' + ahead.map(function (f) { return esc(f.label.toLowerCase()); }).join(", ") + ".</div>";
+      h += '<div class="gate-actions"><button class="btn primary" id="btn-advance"' + (b.length ? " disabled" : "") + ">Avançar para " + next + " →</button>" + (p.stage > 0 ? '<button class="btn ghost sm" id="btn-back">← Voltar a ' + STAGES[p.stage - 1] + "</button>" : "") + "</div></div>";
+    } else {
+      h += '<div class="panel gate ready"><h3>Obra concluída</h3><div class="gate-actions"><button class="btn ghost sm" id="btn-back">← Reabrir em Montagem</button></div></div>';
+    }
+
+    if (p.issue) {
+      h += '<div class="panel gate blocked"><h3>Problema reportado pela ' + esc(p.issue.from) + ' <span class="chip">' + fmtDate(p.issue.at) + '</span></h3><div class="issue">' + esc(p.issue.text) + '</div><div class="gate-actions"><button class="btn" id="btn-resolve">Marcar como resolvido</button></div></div>';
+    }
+
+    // Client request
+    if (owed.length && p.stage < 5) {
+      var w = waitDays(p);
+      h += '<div class="panel"><h3>Pedir ao cliente ' + (w !== null ? '<span class="chip warn">' + (w === 0 ? "Pedido hoje" : "Pedido há " + w + (w === 1 ? " dia" : " dias")) + "</span>" : '<span class="chip">' + owed.length + " em falta</span>") + "</h3>";
+      h += '<textarea class="msg" id="req-msg" aria-label="Mensagem para o cliente" readonly>' + esc(requestMessage(p)) + "</textarea>";
+      h += '<div class="gate-actions"><button class="btn" id="btn-copy">Copiar mensagem</button>';
+      h += w === null ? '<button class="btn" id="btn-requested">Marcar como pedido</button>' : '<button class="btn" id="btn-answered">Cliente respondeu</button>';
+      h += (p.specs.phone ? '<span class="mono" style="color:var(--muted)">' + esc(p.specs.phone) + "</span>" : "") + "</div></div>";
+    } else if (p.waitingSince) {
+      h += '<div class="panel"><h3>Pedido ao cliente</h3><div class="gate-actions"><span>Já não falta nada do cliente.</span><button class="btn sm" id="btn-answered">Fechar pedido</button></div></div>';
+    }
+
+    // Fields by stage
+    for (var s = 0; s < 5; s++) {
+      var fs = FIELDS.filter(function (f) { return (f.stage === s || (s === 0 && f.stage === -1)) && applies(f, p); });
+      var done = !missingAt(p, s).length;
+      h += '<div class="panel stage-sec' + (s > p.stage ? " future" : "") + '"><h3>' + STAGES[s] + (done ? ' <span class="chip ok">Completo</span>' : s === p.stage ? ' <span class="chip bad">Em falta</span>' : s > p.stage ? ' <span class="chip">Pode preencher já</span>' : ' <span class="chip warn">Incompleto</span>') + '</h3><div class="fields">' + fs.map(function (f) { return fieldHTML(p, f, missingKeys); }).join("") + "</div></div>";
+    }
+    h += '<div class="panel"><h3>Prazo e notas</h3><div class="fields"><div class="field"><label for="fld-dueDate">Data prevista de conclusão</label><input type="date" id="fld-dueDate" data-top="dueDate" value="' + esc(p.dueDate || "") + '"></div></div>';
+    h += '<div class="note-add"><input id="note-input" type="text" placeholder="Escrever uma nota (ex.: cliente pediu para ligar depois das 18h)"><button class="btn" id="btn-note">Adicionar</button></div>';
+    h += '<div class="hist">' + (p.history || []).slice().reverse().map(function (e) { return "<div><time>" + fmtDate(e.at) + "</time><span>" + esc(e.text) + "</span></div>"; }).join("") + "</div></div>";
+    h += '<div>' + (confirmDelete ? '<div class="confirm">Apagar este projeto de vez? <button class="btn sm danger" id="btn-del-yes">Apagar</button><button class="btn sm" id="btn-del-no">Cancelar</button></div>' : '<button class="btn ghost sm danger" id="btn-del">Apagar projeto</button>') + "</div>";
+    h += "</div></aside>";
+    root.innerHTML = h;
+    var nb = root.querySelector(".d-body"); if (nb) nb.scrollTop = scroll;
+    if (focusId && document.getElementById(focusId)) document.getElementById(focusId).focus({ preventScroll: true });
+    deferDrawer = false;
+  }
+
+  function current() { return projects.find(function (x) { return x.id === openId; }); }
+
+  function openProject(id) { openId = id; confirmDelete = false; deferDrawer = "force"; renderDrawer(); var c = $("#drawer-root .d-head .btn"); if (c) c.focus(); }
+  function closeDrawer() { openId = null; confirmDelete = false; $("#drawer-root").innerHTML = ""; }
+
+  function createProject() {
+    var p = { id: newId(), ref: nextRef(), stage: 0, specs: { clientType: "Cliente final" }, dueDate: "", waitingSince: null, createdAt: nowISO(), stageSince: nowISO(), history: [] };
+    log(p, "Projeto criado");
+    saveProject(p);
+    openProject(p.id);
+    var n = document.getElementById("fld-clientName"); if (n) n.focus();
+  }
+
+  function byId(id) { var p = projects.find(function (x) { return x.id === id; }); return p ? clone(p) : null; }
+  function workerAction(t) {
+    var act = t.dataset.act;
+    if (act === "report") { reportOpen = t.dataset.id; deferMain = "force"; render(); var ta = document.getElementById("rep-" + reportOpen); if (ta) ta.focus(); return; }
+    if (act === "toggle") { expanded[t.dataset.id] = !expanded[t.dataset.id]; deferMain = "force"; render(); return; }
+    if (act === "report-cancel") { delete drafts["rep-" + reportOpen]; reportOpen = null; deferMain = "force"; render(); return; }
+    var p = byId(t.dataset.id); if (!p) return;
+    if (act === "report-send") {
+      var ta2 = document.getElementById("rep-" + p.id), txt = ta2 ? ta2.value.trim() : "";
+      if (!txt) { toast("Escreva primeiro o que se passa."); return; }
+      p.issue = { text: txt, from: t.dataset.from, at: nowISO() }; log(p, t.dataset.from + " reportou: " + txt);
+      delete drafts["rep-" + p.id]; reportOpen = null; deferMain = "force"; saveProject(p); toast("Enviado à gestora"); return;
+    }
+    if (act === "cut-done") { expanded[p.id] = true; p.specs.cutDone = true; log(p, "Produção: corte e acabamento concluídos (" + (p.specs.slab || "") + ")"); deferMain = "force"; saveProject(p); toast("Marcado como concluído"); return; }
+    if (act === "cut-undo") { p.specs.cutDone = false; log(p, "Produção: corte reaberto"); deferMain = "force"; saveProject(p); return; }
+  }
+  document.addEventListener("submit", function (e) {
+    if (e.target.id !== "cli-form") return;
+    e.preventDefault();
+    var p = byId(clientPick); if (!p) return;
+    var sent = [];
+    e.target.querySelectorAll("[data-cfield]").forEach(function (el) {
+      var f = FIELD[el.dataset.cfield];
+      var v = f.type === "check" ? el.checked : el.value.trim();
+      if (!blank(v)) { p.specs[f.key] = v; sent.push(f.label.toLowerCase()); }
+      delete drafts[el.id];
+    });
+    if (!sent.length) { toast("Preencha pelo menos um campo."); return; }
+    log(p, "Cliente enviou pela página: " + sent.join(", "));
+    if (!clientOwed(p).length) p.waitingSince = null;
+    deferMain = "force"; saveProject(p); toast("Obrigado! Recebemos as suas informações.");
+  });
+
+  // ---------- Events ----------
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button, [data-open], [data-close], .kpi");
+    if (!t) return;
+    if (t.matches("[data-role]")) { setRole(t.dataset.role); return; }
+    if (t.dataset.act) { workerAction(t); return; }
+    if (t.matches("[data-view]")) { view = t.dataset.view; render(); return; }
+    if (t.matches(".kpi[data-filter]")) { listFilter = { q: "", stage: "all", flag: t.dataset.filter }; view = "projetos"; render(); return; }
+    if (t.matches("[data-open]")) { openProject(t.dataset.open); return; }
+    if (t.matches("[data-close]")) { closeDrawer(); return; }
+    if (t.id === "btn-new") { createProject(); return; }
+    if (t.id === "btn-demo-reset") { projects = window.FLUXO_DEMO(); localSave(); closeDrawer(); deferMain = "force"; render(); toast("Exemplos repostos"); return; }
+    var p = current(); if (!p) return;
+    p = clone(p);
+    if (t.id === "btn-advance") {
+      if (blocking(p).length) return;
+      p.stage += 1; p.stageSince = nowISO(); log(p, "Passou a " + STAGES[p.stage]);
+      if (p.stage === 5) p.waitingSince = null;
+      deferDrawer = "force"; saveProject(p); toast("Passou a " + STAGES[p.stage]); return;
+    }
+    if (t.id === "btn-back") { p.stage = Math.max(0, p.stage - 1); p.stageSince = nowISO(); log(p, "Voltou a " + STAGES[p.stage]); deferDrawer = "force"; saveProject(p); return; }
+    if (t.id === "btn-copy") {
+      var txt = requestMessage(p), ta = $("#req-msg");
+      var fallback = function () { ta.removeAttribute("readonly"); ta.focus(); ta.select(); ta.setAttribute("readonly", ""); toast("Texto selecionado. Copie com Ctrl+C."); };
+      try { navigator.clipboard.writeText(txt).then(function () { toast("Mensagem copiada"); }, fallback); } catch (err) { fallback(); }
+      return;
+    }
+    if (t.id === "btn-requested") { p.waitingSince = nowISO(); log(p, "Pedido ao cliente: " + clientOwed(p).map(function (f) { return f.label.toLowerCase(); }).join(", ")); deferDrawer = "force"; saveProject(p); toast("Marcado como pedido"); return; }
+    if (t.id === "btn-answered") { p.waitingSince = null; log(p, "Cliente respondeu"); deferDrawer = "force"; saveProject(p); return; }
+    if (t.id === "btn-note") { var inp = $("#note-input"); var v = inp.value.trim(); if (!v) return; log(p, v); inp.value = ""; inp.blur(); deferDrawer = "force"; saveProject(p); return; }
+    if (t.id === "btn-resolve") { log(p, "Problema resolvido: " + p.issue.text); p.issue = null; deferDrawer = "force"; saveProject(p); return; }
+    if (t.id === "btn-del") { confirmDelete = true; deferDrawer = "force"; renderDrawer(); return; }
+    if (t.id === "btn-del-no") { confirmDelete = false; deferDrawer = "force"; renderDrawer(); return; }
+    if (t.id === "btn-del-yes") { var gone = p; closeDrawer(); removeProject(gone); toast("Projeto apagado"); return; }
+  });
+
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (t.id === "f-stage") { listFilter.stage = t.value; render(); return; }
+    if (t.id === "f-flag") { listFilter.flag = t.value; render(); return; }
+    if (t.id === "cli-pick") { clientPick = t.value; Object.keys(drafts).forEach(function (k) { if (k.indexOf("cf-") === 0) delete drafts[k]; }); deferMain = "force"; render(); return; }
+    if (t.dataset.pfield) {
+      var wp = byId(t.dataset.id); if (!wp) return;
+      var nv = t.value.trim(); if ((wp.specs[t.dataset.pfield] || "") === nv) return;
+      wp.specs[t.dataset.pfield] = nv; log(wp, "Produção: " + FIELD[t.dataset.pfield].label.toLowerCase() + " " + nv); deferMain = "force"; saveProject(wp); return;
+    }
+    if (t.dataset.mcheck) {
+      var mp = byId(t.dataset.id); if (!mp) return;
+      mp.specs[t.dataset.mcheck] = t.checked; if (t.checked) log(mp, "Montagem: " + FIELD[t.dataset.mcheck].label.toLowerCase());
+      deferMain = "force"; saveProject(mp); return;
+    }
+    if (t.dataset.cfield && t.type !== "checkbox") { drafts[t.id] = t.value; return; }
+    var p = current(); if (!p) return;
+    if (t.dataset.field) {
+      p = clone(p);
+      var f = FIELD[t.dataset.field];
+      var val = f.type === "check" ? t.checked : f.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value.trim();
+      if (p.specs[f.key] === val) return;
+      p.specs[f.key] = val;
+      if (f.type === "check" && val) log(p, f.label);
+      deferDrawer = "force";
+      saveProject(p);
+      return;
+    }
+    if (t.dataset.top === "dueDate") { p = clone(p); p.dueDate = t.value; log(p, "Prazo: " + fmtDate(t.value)); deferDrawer = "force"; saveProject(p); }
+  });
+
+  document.addEventListener("input", function (e) {
+    if (e.target.id === "f-q") { listFilter.q = e.target.value; deferMain = "force"; render(); return; }
+    if (e.target.hasAttribute("data-draft")) drafts[e.target.id] = e.target.value;
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && openId) closeDrawer();
+    if (e.key === "Enter" && e.target.id === "note-input") { e.preventDefault(); $("#btn-note").click(); }
+  });
+  document.addEventListener("focusout", function () { setTimeout(function () {
+    if (deferMain === true) { deferMain = "force"; render(); }
+    if (deferDrawer === true) { deferDrawer = "force"; renderDrawer(); }
+  }, 0); });
+
+  // ---------- Boot ----------
+  render();
+  var started = false;
+  function startLocal() {
+    if (started) return; started = true; localMode = true; projects = localLoad();
+    // A standalone demo build sets window.FLUXO_DEMO to sample projects for a first visit.
+    if (!projects.length && typeof window.FLUXO_DEMO === "function") { projects = window.FLUXO_DEMO(); localSave(); }
+    render();
+  }
+  try {
+    if (!window.claude || typeof window.claude.use !== "function") { startLocal(); }
+    else {
+      window.claude.use("db").then(function (db) {
+        if (!db) { startLocal(); return; }
+        started = true; store = db;
+        db.collection("projects").onSnapshot(function (snap) {
+          projects = snap.docs.map(function (d) { var o = clone(d.data()); o.id = d.id; o.specs = o.specs || {}; return o; });
+          render();
+        }, function () { toast("Ligação aos dados perdida. Recarregue a página."); });
+      }, startLocal);
+    }
+  } catch (e) { startLocal(); }
+})();
+</script>
