@@ -507,7 +507,7 @@ td.num { font-variant-numeric: tabular-nums; }
     var caret = focusId && document.activeElement.selectionStart;
     if (focusId && document.activeElement.matches("input[type=text], textarea") && deferMain !== "force") { deferMain = true; return; }
     deferMain = false;
-    var banner = !localMode ? "" : window.FLUXO_DEMO ? '<div class="banner">Demonstração com projetos de exemplo. As alterações ficam guardadas só neste navegador. <button class="btn sm" id="btn-demo-reset">Repor exemplos</button></div>' : '<div class="banner">Modo local: os dados ficam guardados só neste navegador. Abra a página no claude.ai para partilhar os projetos com a equipa.</div>';
+    var banner = !localMode ? "" : window.FLUXO_DEMO ? '<div class="banner">Demonstração com projetos de exemplo. As alterações ficam guardadas só neste navegador. <button class="btn sm" id="btn-demo-reset">Repor exemplos</button> <a class="btn sm" href="fabrica.html">Vista 3D da fábrica</a></div>' : '<div class="banner">Modo local: os dados ficam guardados só neste navegador. Abra a página no claude.ai para partilhar os projetos com a equipa.</div>';
     renderHead();
     var body = role === "producao" ? renderProducao() : role === "montagem" ? renderMontagem() : role === "cliente" ? renderCliente() : view === "painel" ? renderPainel() : renderProjetos();
     v.innerHTML = banner + body;

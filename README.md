@@ -24,6 +24,7 @@ Links diretos para cada vista: `/#producao`, `/#montagem`, `/#cliente`.
 ## Ficheiros
 
 - `index.html`: a aplicação.
-- `demo.js`: projetos de exemplo, com datas relativas ao dia de hoje.
+- `demo.js`: projetos de exemplo, com datas relativas ao dia de hoje, e a leitura simulada de "Importar pedido".
+- `fabrica.html`: vista 3D das instalações, feita a partir da imagem de satélite, com os trabalhos em curso em cada zona. As funções de cada pavilhão ainda estão por confirmar.
 - `source/fluxo-de-obras.html`: a mesma aplicação na versão para o claude.ai (dados partilhados).
 - `build.py`: gera o `index.html` a partir de `source/` (`python3 build.py`).

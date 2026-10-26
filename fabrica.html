@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vista da fábrica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #e9ecea; --surface: #ffffff; --surface-2: #f3f4f3; --line: #d9dedb;
+  --fg: #1d2421; --muted: #5d6763; --accent: #1f5f5b; --accent-fg: #fff; --accent-soft: #dcebe9;
+  --bad: #b3261e; --bad-soft: #f7e1df; --warn: #9a6200; --warn-soft: #f8ecd4;
+  --f-display: "Archivo", system-ui, sans-serif; --f-body: "Source Sans 3", system-ui, sans-serif; --f-mono: "JetBrains Mono", ui-monospace, monospace;
+  --scene: #e4e8e5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2220; --surface-2: #232b28; --line: #33403b;
+    --fg: #e6ebe9; --muted: #9aa7a2; --accent: #6fbfb6; --accent-fg: #0c1614; --accent-soft: #1f3633;
+    --bad: #f2867d; --bad-soft: #3a1f1d; --warn: #e8b45c; --warn-soft: #3a2e17; --scene: #1a201e;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2220; --surface-2: #232b28; --line: #33403b;
+  --fg: #e6ebe9; --muted: #9aa7a2; --accent: #6fbfb6; --accent-fg: #0c1614; --accent-soft: #1f3633;
+  --bad: #f2867d; --bad-soft: #3a1f1d; --warn: #e8b45c; --warn-soft: #3a2e17; --scene: #1a201e;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.45 var(--f-body); overflow: hidden; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; }
+#scene { position: fixed; inset: 0; }
+#scene canvas { display: block; touch-action: none; }
+header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: 12px 16px; pointer-events: none; }
+header > * { pointer-events: auto; }
+.brand { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.brand h1 { font-size: 16px; }
+.brand small { display: block; color: var(--muted); font-size: 12px; font-family: var(--f-body); font-weight: 400; }
+.grow { flex: 1; }
+.btn { font: 600 14px var(--f-body); border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 8px; padding: 8px 12px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#panel { position: fixed; left: 16px; top: 76px; bottom: 16px; width: 320px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+#panel .ph { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+#panel .ph p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+#zones { overflow: auto; padding: 8px; }
+.zone { border: 1px solid transparent; border-radius: 8px; padding: 10px; }
+.zh { width: 100%; text-align: left; border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; display: block; }
+.zone:has(.zh:hover), .zone.on { background: var(--surface-2); border-color: var(--line); }
+.zone .zt { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
+.zone .zt b { margin-left: auto; font-family: var(--f-mono); font-size: 13px; }
+.zone .zs { color: var(--muted); font-size: 13px; }
+.zone .guess { font-size: 11px; color: var(--warn); background: var(--warn-soft); border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+.jobs { margin: 6px 0 0; padding: 0; list-style: none; }
+.jobs li button { width: 100%; text-align: left; font: inherit; font-size: 13px; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-top: 4px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+.jobs li button:hover { border-color: var(--accent); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); }
+.dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); }
+.legend { padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+.legend span { display: inline-flex; gap: 5px; align-items: center; }
+#labels { position: fixed; inset: 0; pointer-events: none; }
+.lbl { position: absolute; transform: translate(-50%, -100%); background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font: 600 12px var(--f-body); white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.12); pointer-events: auto; cursor: pointer; }
+.lbl b { font-family: var(--f-mono); color: var(--accent); margin-left: 4px; }
+.lbl.on { border-color: var(--accent); }
+#card { position: fixed; right: 16px; top: 76px; width: 300px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+#card[hidden] { display: none; }
+#card .ref { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+#card dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0; font-size: 14px; }
+#card dt { color: var(--muted); }
+#card dd { margin: 0; }
+.chip { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 2px 8px; background: var(--accent-soft); color: var(--accent); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); } .chip.warn { background: var(--warn-soft); color: var(--warn); }
+#tip { position: fixed; pointer-events: none; background: var(--fg); color: var(--bg); font-size: 12px; padding: 4px 8px; border-radius: 6px; transform: translate(12px, 12px); white-space: nowrap; }
+#tip[hidden] { display: none; }
+.hint { position: fixed; right: 16px; bottom: 16px; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+#panel-toggle { display: none; }
+@media (max-width: 760px) {
+  header { padding: 10px 16px; }
+  .brand small, .wide { display: none; }
+  .brand h1 { font-size: 15px; }
+  #panel { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 46vh; border-radius: 14px 14px 0 0; border-bottom: 0; }
+  #panel.min { max-height: 52px; }
+  #panel-toggle { display: inline-flex; }
+  #card { left: 16px; right: 16px; width: auto; top: 64px; }
+  .hint { display: none; }
+  .lbl { font-size: 11px; padding: 2px 6px; }
+}
+</style>
+<script src="demo.js"></script>
+</head>
+<body>
+<div id="scene" aria-label="Modelo 3D das instalações da fábrica"></div>
+<div id="labels"></div>
+<header>
+  <div class="brand"><div><h1>Vista da fábrica</h1><small>MSI Stone · trabalhos em curso por zona</small></div></div>
+  <div class="grow"></div>
+  <button class="btn" id="btn-reset" title="Repor a vista inicial">Repor<span class="wide">vista</span></button>
+  <a class="btn primary" href="./">←<span class="wide">Fluxo de Obras</span></a>
+</header>
+<aside id="panel">
+  <div class="ph"><div style="display:flex;align-items:center;gap:8px"><h2 style="font-size:16px" class="grow">Zonas</h2><button class="btn" id="panel-toggle" aria-expanded="true">Ocultar</button></div>
+  <p>Planta feita a partir da vista de satélite. As funções marcadas "a confirmar" são suposições.</p></div>
+  <div id="zones"></div>
+  <div class="legend"><span><i class="dot"></i>Em dia</span><span><i class="dot warn"></i>À espera de detalhes</span><span><i class="dot bad"></i>Fora do prazo</span></div>
+</aside>
+<div id="card" hidden></div>
+<div id="tip" hidden></div>
+<div class="hint">Arraste para rodar · scroll para aproximar · clique numa peça</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// ---------- Data: the same projects the Fluxo de Obras page keeps in this browser ----------
+const STAGES = ["Orçamento", "Confirmação", "Medição", "Produção", "Montagem", "Concluído"];
+let projects = [];
+try { projects = JSON.parse(localStorage.getItem("fluxo-obras-local") || "[]"); } catch (e) {}
+if (!projects.length && typeof window.FLUXO_DEMO === "function") projects = window.FLUXO_DEMO();
+const today = new Date().toISOString().slice(0, 10);
+const late = (p) => p.dueDate && p.dueDate < today && p.stage < 5;
+const waiting = (p) => !!p.waitingSince || !!p.issue;
+const status = (p) => late(p) ? "bad" : waiting(p) ? "warn" : "";
+
+// ---------- Site plan: pixel coordinates measured on the satellite image (~0.1 m per pixel) ----------
+const S = 0.1, CX = 515, CY = 320;
+const X = (px) => (px - CX) * S, Z = (py) => (py - CY) * S;
+const rect = (x1, y1, x2, y2) => ({ x: X((x1 + x2) / 2), z: Z((y1 + y2) / 2), w: (x2 - x1) * S, d: (y2 - y1) * S });
+
+// Zones: where each stage of the process happens. Functions are guesses until the factory confirms them.
+const ZONES = [
+  { id: "escritorio", name: "Escritório", sub: "Orçamentos, confirmação e marcação de medições", guess: true, r: rect(55, 65, 135, 170), stages: [0, 1, 2], h: 4 },
+  { id: "corte", name: "Pavilhão 1 · Corte", sub: "Chapas a cortar (Produção)", guess: true, r: rect(12, 212, 615, 328), h: 7 },
+  { id: "acabamento", name: "Pavilhão 2 · Acabamento", sub: "Peças cortadas, à espera de montagem", guess: true, r: rect(12, 410, 625, 545), h: 8 },
+  { id: "stock", name: "Parque de chapas", sub: "Stock de pedra ao ar livre", r: rect(140, 25, 860, 200) },
+  { id: "cargas", name: "Cargas e saída", sub: "Peças prontas para montagem em obra (Montagem)", guess: true, r: rect(640, 210, 860, 400), stages: [4] }
+];
+const zoneOf = (p) => p.stage <= 2 ? "escritorio" : p.stage === 3 ? (p.specs && p.specs.cutDone ? "acabamento" : "corte") : p.stage === 4 ? "cargas" : null;
+
+// ---------- Scene ----------
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const host = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+host.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 800);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.46;
+controls.minDistance = 15; controls.maxDistance = 220;
+const wide = () => innerWidth > 760;
+const HOME = wide() ? { pos: new THREE.Vector3(-32, 88, 92), target: new THREE.Vector3(-14, 0, 4) } : { pos: new THREE.Vector3(-50, 170, 175), target: new THREE.Vector3(-6, 0, 34) };
+camera.position.copy(HOME.pos); controls.target.copy(HOME.target);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f86, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(-40, 80, 30); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 50, bottom: -50, near: 1, far: 220 });
+scene.add(sun);
+
+const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true, ...o });
+const M = {
+  grass: mat(0xb9c4a0), dirt: mat(0xc7a77d), concrete: mat(0xd5d3cc), road: mat(0x9a9890), wall: mat(0xf4f3ef),
+  wallDark: mat(0xe2e0da), roofRed: mat(0xb0585a), roofBrown: mat(0x9a6a4e), roofWhite: mat(0xdfe3e4, { metalness: 0.2 }),
+  roofTile: mat(0xc0784f), metal: mat(0xc9cdcf, { metalness: 0.4 }), blue: mat(0x6f86a6), dark: mat(0x3b3f42), truck: mat(0xeeeeee)
+};
+function box(w, h, d, m, x, y, z, parent = scene) {
+  const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+  o.position.set(x, y + h / 2, z); o.castShadow = o.receiveShadow = true; parent.add(o); return o;
+}
+function flat(r, m, y = 0.02) {
+  const o = new THREE.Mesh(new THREE.PlaneGeometry(r.w, r.d), m);
+  o.rotation.x = -Math.PI / 2; o.position.set(r.x, y, r.z); o.receiveShadow = true; scene.add(o); return o;
+}
+
+// Ground, plot and road (the entrance is on the east side, by the road).
+flat({ x: 0, z: 0, w: 400, d: 300 }, M.grass, 0);
+flat(rect(5, 5, 1015, 630), M.concrete);
+flat(rect(865, 20, 1010, 325), M.dirt, 0.04);
+flat(rect(865, 435, 1010, 600), M.dirt, 0.04);
+flat(rect(1025, -400, 1075, 1100), M.road, 0.03);
+flat(rect(-600, -40, 1075, 5), M.road, 0.03);
+
+// Perimeter wall with the open gate on the east side.
+const WH = 1.7, WT = 0.3;
+[[5, 5, 1015, 5], [5, 5, 5, 630], [5, 630, 1015, 630], [1015, 5, 1015, 330], [1015, 430, 1015, 630]].forEach(([x1, y1, x2, y2]) => {
+  const w = Math.max((x2 - x1) * S, WT), d = Math.max((y2 - y1) * S, WT);
+  box(w, WH, d, M.wall, X((x1 + x2) / 2), 0, Z((y1 + y2) / 2));
+});
+
+// Gable-roof hall (Pavilhão 1): walls plus a two-sided roof, ridge running east-west.
+function gableHall(r, h, roofA, roofB) {
+  const g = new THREE.Group();
+  box(r.w, h, r.d, M.wall, 0, 0, 0, g);
+  const rise = 2.6, half = r.d / 2, slope = Math.hypot(half, rise), ang = Math.atan2(rise, half);
+  [[roofA, -1], [roofB, 1]].forEach(([m, s]) => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(r.w + 0.6, 0.25, slope + 0.4), m);
+    p.position.set(0, h + rise / 2, s * half / 2); p.rotation.x = s * ang; p.castShadow = p.receiveShadow = true; g.add(p);
+  });
+  const tri = new THREE.Shape([new THREE.Vector2(-half, 0), new THREE.Vector2(half, 0), new THREE.Vector2(0, rise)]);
+  [-1, 1].forEach((s) => {
+    const gab = new THREE.Mesh(new THREE.ShapeGeometry(tri), M.wall);
+    gab.rotation.y = Math.PI / 2; gab.position.set(s * r.w / 2, h, 0); gab.material.side = THREE.DoubleSide; g.add(gab);
+  });
+  g.position.set(r.x, 0, r.z); scene.add(g); return g;
+}
+// Curved-roof hall (Pavilhão 2): walls plus a shallow barrel roof.
+function barrelHall(r, h) {
+  const g = new THREE.Group();
+  box(r.w, h, r.d, M.wall, 0, 0, 0, g);
+  const roof = new THREE.Mesh(new THREE.CylinderGeometry(r.d / 2, r.d / 2, r.w, 28, 1, true, 0, Math.PI), M.roofWhite);
+  roof.material.side = THREE.DoubleSide;
+  roof.rotation.z = Math.PI / 2; roof.scale.set(0.32, 1, 1); roof.position.y = h; roof.castShadow = true; g.add(roof);
+  g.position.set(r.x, 0, r.z); scene.add(g); return g;
+}
+const buildings = {
+  corte: gableHall(rect(12, 212, 615, 328), 7, M.roofBrown, M.roofRed),
+  acabamento: barrelHall(rect(12, 410, 625, 545), 7.5)
+};
+const office = new THREE.Group(); scene.add(office);
+const o = rect(55, 65, 135, 170);
+box(o.w, 3.6, o.d, M.wall, o.x, 0, o.z, office);
+box(o.w + 0.4, 0.4, o.d + 0.4, M.roofTile, o.x, 3.6, o.z, office);
+buildings.escritorio = office;
+
+// Smaller sheds and annexes seen on the image.
+box(...[rect(12, 545, 250, 615)].map((r) => [r.w, 5, r.d, M.wallDark, r.x, 0, r.z])[0]);
+box(...[rect(360, 540, 440, 600)].map((r) => [r.w, 4, r.d, M.blue, r.x, 0, r.z])[0]);
+box(...[rect(185, 600, 730, 628)].map((r) => [r.w, 3.5, r.d, M.roofTile, r.x, 0, r.z])[0]);
+box(...[rect(325, 385, 390, 418)].map((r) => [r.w, 2.6, r.d, M.metal, r.x, 0, r.z])[0]);
+box(...[rect(40, 188, 112, 214)].map((r) => [r.w, 2.4, r.d, M.metal, r.x, 0, r.z])[0]);
+box(...[rect(12, 395, 45, 420)].map((r) => [r.w, 2.4, r.d, M.metal, r.x, 0, r.z])[0]);
+// Silos / tanks.
+[[160, 160, 1.5, 6], [35, 345, 2.4, 4]].forEach(([px, py, rad, h]) => {
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, h, 24), M.wall);
+  c.position.set(X(px), h / 2, Z(py)); c.castShadow = true; scene.add(c);
+  const top = new THREE.Mesh(new THREE.ConeGeometry(rad, 1, 24), M.metal);
+  top.position.set(X(px), h + 0.5, Z(py)); scene.add(top);
+});
+
+// Stone slabs on A-frame racks in the yard.
+const STONE = [0xf2f0ea, 0xd9d6cf, 0x2d2f31, 0xb8b2a6, 0xe8dcc8, 0x8d8f91, 0xc9c1b4];
+const slabGeo = new THREE.BoxGeometry(0.06, 1.9, 3);
+function rack(px, py, n, rot = 0) {
+  const g = new THREE.Group();
+  box(0.3, 0.3, 3.2, M.dark, 0, 0, 0, g);
+  for (let i = 0; i < n; i++) {
+    const s = i % 2 ? 1 : -1, k = Math.floor(i / 2);
+    const m = new THREE.Mesh(slabGeo, mat(STONE[(px + py + i * 3) % STONE.length]));
+    m.position.set(s * (0.25 + k * 0.08), 1.05, 0); m.rotation.z = -s * 0.12; m.castShadow = true; g.add(m);
+  }
+  g.position.set(X(px), 0, Z(py)); g.rotation.y = rot; scene.add(g);
+}
+[385, 410, 470, 495, 520, 575, 600, 625, 665, 690].forEach((px, i) => rack(px, 115, 6 + (i % 3) * 2));
+for (let px = 160; px <= 840; px += 32) rack(px, 55, 4 + (px % 5), Math.PI / 2);
+[740, 750].forEach((px) => rack(px, 260, 6));
+[680, 735, 795].forEach((px) => rack(px, 548, 4, Math.PI / 2));
+// A truck and a forklift near the loading area.
+const truck = new THREE.Group();
+box(2.4, 2.6, 5.5, M.truck, 0, 0.5, 0.6, truck); box(2.4, 2, 1.8, M.blue, 0, 0.5, -3, truck);
+truck.position.set(X(705), 0, Z(268)); scene.add(truck);
+const fork = new THREE.Group();
+box(1.2, 1.4, 2, mat(0xd9a520), 0, 0.2, 0, fork); box(1.2, 1.2, 0.1, M.dark, 0, 0.4, 1.1, fork);
+fork.position.set(X(690), 0, Z(155)); scene.add(fork);
+
+// ---------- Jobs as slabs, placed in the zone where they are now ----------
+const jobGroup = new THREE.Group(); scene.add(jobGroup);
+const pickables = [];
+const STATUS_COLOR = { "": 0x1f5f5b, warn: 0xd08a12, bad: 0xc0392b };
+function jobSpot(z, i) {
+  const r = ZONES.find((q) => q.id === z).r;
+  if (z === "escritorio") return new THREE.Vector3(r.x + r.w / 2 + 4 + (i % 2) * 4.4, 0, r.z - 6 + Math.floor(i / 2) * 6.4);
+  if (z === "cargas") return new THREE.Vector3(r.x - 4 + (i % 3) * 4.4, 0, r.z + 6 + Math.floor(i / 3) * 6.4);
+  // Inside a hall: show them floating above the roof line so they stay visible.
+  return new THREE.Vector3(r.x - r.w / 2 + 12 + i * 9, 0, r.z);
+}
+const counts = {};
+projects.forEach((p) => {
+  const z = zoneOf(p); if (!z) return;
+  const i = counts[z] = (counts[z] || 0); counts[z]++;
+  const pos = jobSpot(z, i), inHall = z === "corte" || z === "acabamento";
+  const g = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.5, 5), mat(STONE[i % STONE.length], { flatShading: false, roughness: 0.4 }));
+  slab.castShadow = true; g.add(slab);
+  const tag = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.3, 5.3), mat(STATUS_COLOR[status(p)], { emissive: STATUS_COLOR[status(p)], emissiveIntensity: 0.35 }));
+  tag.position.y = -0.38; g.add(tag);
+  const baseY = inHall ? ZONES.find((q) => q.id === z).h + 6 : 1.6;
+  if (inHall) {
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, baseY - 3), M.dark);
+    pin.position.y = -(baseY - 3) / 2; g.add(pin);
+  }
+  g.position.set(pos.x, baseY, pos.z);
+  g.userData = { p, baseY, phase: Math.random() * 6 };
+  slab.userData.job = tag.userData.job = g;
+  pickables.push(slab, tag);
+  jobGroup.add(g);
+});
+
+// ---------- Side panel ----------
+const zonesEl = document.getElementById("zones");
+let selZone = null, selJob = null;
+function jobsIn(z) { return projects.filter((p) => zoneOf(p) === z); }
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function renderPanel() {
+  const done = projects.filter((p) => p.stage === 5).length;
+  zonesEl.innerHTML = ZONES.map((z) => {
+    const js = jobsIn(z.id);
+    return `<div class="zone${selZone === z.id ? " on" : ""}"><button class="zh" data-zone="${z.id}"><div class="zt">${esc(z.name)}${z.guess ? ' <span class="guess">a confirmar</span>' : ""}<b>${z.id === "stock" ? "" : js.length}</b></div><div class="zs">${esc(z.sub)}</div></button>` +
+      (js.length ? `<ul class="jobs">${js.map((p) => `<li><button data-job="${esc(p.id)}"><i class="dot ${status(p)}"></i>${esc(p.ref)} · ${esc(p.specs.clientName || "")}</button></li>`).join("")}</ul>` : "") + "</div>";
+  }).join("") + `<div class="zone" style="cursor:default"><div class="zt">Concluídos<b>${done}</b></div><div class="zs">Já entregues e fechados, fora do mapa</div></div>`;
+}
+renderPanel();
+
+// ---------- Labels that follow the 3D zones ----------
+const labelsEl = document.getElementById("labels");
+const labelEls = ZONES.map((z) => {
+  const el = document.createElement("div");
+  el.className = "lbl"; el.dataset.zone = z.id;
+  el.innerHTML = esc(z.name) + (z.id === "stock" ? "" : `<b>${jobsIn(z.id).length}</b>`);
+  labelsEl.appendChild(el);
+  return { el, pos: new THREE.Vector3(z.r.x, (z.h || 2) + (z.id === "corte" || z.id === "acabamento" ? 3 : 2), z.id === "stock" ? z.r.z - 2 : z.r.z - (z.id === "escritorio" ? 0 : z.r.d / 2 - 1)) };
+});
+const v = new THREE.Vector3();
+function placeLabels() {
+  const w = host.clientWidth, h = host.clientHeight;
+  labelEls.forEach(({ el, pos }) => {
+    v.copy(pos).project(camera);
+    const off = v.z > 1;
+    el.style.display = off ? "none" : "";
+    el.style.left = ((v.x + 1) / 2 * w) + "px"; el.style.top = ((1 - v.y) / 2 * h) + "px";
+    el.classList.toggle("on", el.dataset.zone === selZone);
+  });
+}
+
+// ---------- Selection, camera moves and the job card ----------
+let fly = null;
+function flyTo(target, dist) {
+  const dir = new THREE.Vector3(-0.35, 0.8, 0.5).normalize();
+  fly = { t: 0, fromP: camera.position.clone(), fromT: controls.target.clone(), toT: target.clone(), toP: target.clone().add(dir.multiplyScalar(dist)) };
+}
+function selectZone(id) {
+  selZone = id; renderPanel();
+  const z = ZONES.find((q) => q.id === id);
+  flyTo(new THREE.Vector3(z.r.x, 0, z.r.z), Math.max(28, Math.max(z.r.w, z.r.d) * 1.1));
+}
+const card = document.getElementById("card");
+function selectJob(id) {
+  const g = jobGroup.children.find((c) => c.userData.p.id === id);
+  if (!g) return;
+  selJob = g; selZone = zoneOf(g.userData.p); renderPanel();
+  const p = g.userData.p, s = p.specs || {}, st = status(p);
+  card.innerHTML = `<div style="display:flex;gap:8px;align-items:start"><div class="grow"><div class="ref">${esc(p.ref)}</div><h3 style="font-size:17px">${esc(s.clientName || "Sem nome")}</h3></div><button class="btn" id="card-x" aria-label="Fechar">✕</button></div>` +
+    `<div style="margin-top:6px"><span class="chip">${esc(STAGES[p.stage])}</span> ${st === "bad" ? '<span class="chip bad">Fora do prazo</span>' : st === "warn" ? '<span class="chip warn">' + (p.issue ? "Problema reportado" : "À espera do cliente") + "</span>" : ""}</div>` +
+    `<dl><dt>Peça</dt><dd>${esc(s.pieceType || "—")}</dd><dt>Pedra</dt><dd>${esc(s.stone || "—")}</dd>${s.area ? `<dt>Área</dt><dd>${esc(s.area)} m²</dd>` : ""}<dt>Prazo</dt><dd>${p.dueDate ? new Date(p.dueDate + "T12:00").toLocaleDateString("pt-PT") : "—"}</dd>${s.installDate ? `<dt>Montagem</dt><dd>${new Date(s.installDate + "T12:00").toLocaleDateString("pt-PT")}</dd>` : ""}${p.issue ? `<dt>Problema</dt><dd>${esc(p.issue.text)}</dd>` : ""}</dl>` +
+    `<a class="btn primary" href="./">Abrir no Fluxo de Obras</a>`;
+  card.hidden = false;
+  flyTo(g.position.clone().setY(g.userData.baseY / 2), 42);
+}
+function clearJob() { selJob = null; card.hidden = true; }
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-zone], [data-job], #card-x, #btn-reset, #panel-toggle");
+  if (!t) return;
+  if (t.dataset.job) { e.stopPropagation(); selectJob(t.dataset.job); return; }
+  if (t.dataset.zone) { clearJob(); selectZone(t.dataset.zone); return; }
+  if (t.id === "card-x") { clearJob(); return; }
+  if (t.id === "btn-reset") { clearJob(); selZone = null; renderPanel(); fly = { t: 0, fromP: camera.position.clone(), fromT: controls.target.clone(), toT: HOME.target.clone(), toP: HOME.pos.clone() }; return; }
+  if (t.id === "panel-toggle") { const pn = document.getElementById("panel"); const min = pn.classList.toggle("min"); t.textContent = min ? "Mostrar" : "Ocultar"; t.setAttribute("aria-expanded", String(!min)); }
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") clearJob(); });
+
+// Hover and click on the slabs in the scene.
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), tip = document.getElementById("tip");
+let hover = null, downAt = null;
+function pick(ev) {
+  const b = renderer.domElement.getBoundingClientRect();
+  mouse.set((ev.clientX - b.left) / b.width * 2 - 1, -(ev.clientY - b.top) / b.height * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(pickables)[0];
+  return hit ? hit.object.userData.job : null;
+}
+renderer.domElement.addEventListener("pointermove", (ev) => {
+  hover = pick(ev);
+  renderer.domElement.style.cursor = hover ? "pointer" : "";
+  if (hover) { const p = hover.userData.p; tip.textContent = p.ref + " · " + (p.specs.clientName || "") + " · " + STAGES[p.stage]; tip.style.left = ev.clientX + "px"; tip.style.top = ev.clientY + "px"; tip.hidden = false; }
+  else tip.hidden = true;
+});
+renderer.domElement.addEventListener("pointerdown", (ev) => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener("pointerup", (ev) => {
+  if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;
+  const j = pick(ev); if (j) selectJob(j.userData.p.id);
+});
+
+// ---------- Loop ----------
+function resize() {
+  const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+function applyTheme() { scene.background = new THREE.Color(css("--scene") || "#e4e8e5"); scene.fog = new THREE.Fog(scene.background, 160, 380); }
+addEventListener("resize", resize);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+applyTheme(); resize();
+const clock = new THREE.Clock();
+const ease = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta(), t = clock.elapsedTime;
+  if (fly) {
+    fly.t = Math.min(1, fly.t + dt / 0.9); const k = ease(fly.t);
+    camera.position.lerpVectors(fly.fromP, fly.toP, k); controls.target.lerpVectors(fly.fromT, fly.toT, k);
+    if (fly.t >= 1) fly = null;
+  }
+  jobGroup.children.forEach((g) => {
+    const on = g === selJob || g === hover;
+    g.position.y = g.userData.baseY + Math.sin(t * 1.6 + g.userData.phase) * 0.25 + (on ? 0.8 : 0);
+    g.scale.setScalar(on ? 1.25 : 1);
+  });
+  controls.update();
+  renderer.render(scene, camera);
+  placeLabels();
+});
+labelsEl.addEventListener("click", (e) => { const l = e.target.closest(".lbl"); if (l) { clearJob(); selectZone(l.dataset.zone); } });
+</script>
+</body>
+</html>
